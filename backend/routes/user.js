@@ -298,12 +298,20 @@ router.put('/profile', verifyToken, async (req, res) => {
 
 /**
  * ---------------------------------------
- * DELETE /api/auth/delete/:userId - 계정 삭제
+ * DELETE /api/auth/delete/:userId - 계정 삭제 (본인 또는 관리자만)
  * ---------------------------------------
  */
-router.delete('/delete/:userId', async (req, res) => {
+router.delete('/delete/:userId', verifyToken, async (req, res) => {
     try {
-      const user = await User.findByIdAndDelete(req.params.userId);
+      const requesterId = req.user.userId;
+      const targetId = req.params.userId;
+
+      // 본인 계정이 아니고 관리자도 아니면 거부
+      if (requesterId !== targetId && req.user.role !== 1) {
+        return res.status(403).json({ message: '본인 계정만 삭제할 수 있습니다.' });
+      }
+
+      const user = await User.findByIdAndDelete(targetId);
       if (!user) {
         return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
       }
@@ -316,13 +324,17 @@ router.delete('/delete/:userId', async (req, res) => {
 
 /**
  * -----------------------------------------------------------
- * DELETE /api/auth/delete-by-username/:username - 계정 삭제 (임시)
+ * DELETE /api/auth/delete-by-username/:username - 계정 삭제 (관리자 전용)
  * -----------------------------------------------------------
  */
-router.delete('/delete-by-username/:username', async (req, res) => {
+router.delete('/delete-by-username/:username', verifyToken, async (req, res) => {
     try {
+      if (req.user.role !== 1) {
+        return res.status(403).json({ message: '관리자만 사용할 수 있습니다.' });
+      }
+
       const { username } = req.params;
-      const user = await User.findOneAndDelete({ username: username });
+      const user = await User.findOneAndDelete({ username });
       if (!user) {
         return res.status(404).json({ message: '해당 사용자 이름을 가진 사용자를 찾을 수 없습니다.' });
       }
