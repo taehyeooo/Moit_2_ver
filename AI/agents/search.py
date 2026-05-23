@@ -16,6 +16,7 @@ from langchain_pinecone import PineconeVectorStore
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.tools.retriever import create_retriever_tool
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 
@@ -51,6 +52,19 @@ def _build_tools() -> list:
     return tools
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(Exception),
+    before_sleep=lambda rs: logging.warning(
+        f"에이전트 실행 실패 — {rs.attempt_number}회 재시도 중... ({rs.outcome.exception()})"
+    )
+)
+def _run_agent_with_retry(executor: AgentExecutor, query: str) -> dict:
+    """OpenAI Tools Agent 실행 — 일시적 오류 시 최대 3회 지수 백오프 재시도."""
+    return executor.invoke({"input": query, "chat_history": []})
+
+
 def call_general_search_agent(state: dict) -> dict:
     """Pinecone RAG + Tavily 검색을 활용하는 범용 ReAct 에이전트."""
     logging.info("--- CALLING: General Search Agent ---")
@@ -83,10 +97,10 @@ def call_general_search_agent(state: dict) -> dict:
         query = str(user_input)
 
     try:
-        result = executor.invoke({"input": query, "chat_history": []})
+        result = _run_agent_with_retry(executor, query)
         answer = result.get("output", "죄송합니다. 답변을 생성하지 못했습니다.")
     except Exception as e:
-        logging.error(f"에이전트 실행 오류: {e}")
+        logging.error(f"에이전트 실행 최종 실패 (3회 재시도 소진): {e}")
         answer = "오류가 발생하여 답변할 수 없습니다."
 
     return {"final_answer": answer}

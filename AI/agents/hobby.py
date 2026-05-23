@@ -11,6 +11,7 @@ from typing import List, TypedDict
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
 import google.generativeai as genai
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from utils.survey import convert_raw_answers
 
@@ -143,6 +144,21 @@ def analyze_survey_tool(survey_json_string: str) -> dict:
 
 # ─── 사진 분석 Tool ──────────────────────────────────────
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(Exception),
+    before_sleep=lambda rs: logging.warning(
+        f"Gemini 호출 실패 — {rs.attempt_number}회 재시도 중... ({rs.outcome.exception()})"
+    )
+)
+def _call_gemini_with_retry(model, prompt_text: str, image_parts: list) -> str:
+    """Gemini API 호출 — 일시적 오류 시 최대 3회 지수 백오프 재시도."""
+    response = model.generate_content([prompt_text] + image_parts)
+    logging.info("--- Gemini 응답 완료 ---")
+    return response.text
+
+
 @tool
 def analyze_photo_tool(image_paths: list[str], survey_profile: dict) -> str:
     """사용자 사진과 설문 프로파일을 바탕으로 Gemini가 취미를 추천합니다."""
@@ -163,11 +179,9 @@ def analyze_photo_tool(image_paths: list[str], survey_profile: dict) -> str:
 
     try:
         model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content([prompt_text] + image_parts)
-        logging.info("--- Gemini 응답 완료 ---")
-        return response.text
+        return _call_gemini_with_retry(model, prompt_text, image_parts)
     except Exception as e:
-        logging.error(f"Gemini 호출 오류: {e}")
+        logging.error(f"Gemini 호출 최종 실패 (3회 재시도 소진): {e}")
         return json.dumps({
             "summary": "AI 모델 연결에 일시적인 문제가 발생했습니다. API 키와 접근 권한을 확인해주세요.",
             "recommendations": []
