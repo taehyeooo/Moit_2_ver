@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require('jsonwebtoken');
-const axios = require('axios');
 const User = require('../models/User');
 const Meeting = require('../models/Meeting');
 const { verifyToken } = require('../utils/auth');
@@ -126,13 +125,7 @@ router.post('/login', async (req, res) => {
     user.lastLoginAttempt = new Date();
     user.isLoggedIn = true;
     
-    try {
-      const response = await axios.get("https://api.ipify.org?format=json");
-      user.ipAddress = response.data.ip;
-    } catch (ipError) {
-      console.error("IP 주소를 가져오는 중 오류 발생:", ipError.message);
-      user.ipAddress = req.ip;
-    }
+    user.ipAddress = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
     
     await user.save();
 
