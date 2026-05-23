@@ -281,7 +281,7 @@ router.put('/profile', verifyToken, async (req, res) => {
             if (!isMatch) {
                 return res.status(401).json({ message: '현재 비밀번호가 일치하지 않습니다.' });
             }
-            user.password = await bcrypt.hash(newPassword, 10);
+            user.password = newPassword; // pre-save 훅이 해싱 처리
         }
 
         await user.save();
