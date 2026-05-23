@@ -25,6 +25,7 @@ from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langgraph.graph import StateGraph, END
 from langchain_core.tools import tool
 from tenacity import retry, stop_after_attempt, wait_fixed
+from utils.survey import convert_raw_answers
 import google.generativeai as genai
 from requests.exceptions import Timeout, ConnectionError
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -85,7 +86,7 @@ def route_request(state: MasterAgentState):
     logging.info("--- ROUTING ---")
     user_input = state['user_input']
     
-    if isinstance(user_input, dict) and 'survey' in user_input:
+    if isinstance(user_input, dict) and ('survey' in user_input or 'survey_raw' in user_input):
         logging.info("라우팅 결정: hobby_recommendation (Rule-based)")
         return {"route": "hobby_recommendation"}
 
@@ -338,13 +339,19 @@ hobby_graph = hobby_builder.compile()
 def call_multimodal_hobby_agent(state: MasterAgentState):
     logging.info("--- CALLING: Hobby Agent ---")
     user_input = state['user_input']
-    survey_data = user_input.get('survey', {})
-    
-    if isinstance(survey_data, str):
-        try:
-            survey_data = json.loads(survey_data)
-        except:
-            pass
+
+    # survey_raw: 프론트엔드 원본 응답 → AI 서버에서 변환
+    # survey: 이미 변환된 숫자 인덱스 (하위 호환)
+    if 'survey_raw' in user_input:
+        survey_data = convert_raw_answers(user_input['survey_raw'])
+        logging.info("설문 원본 응답을 AI 서버에서 변환 완료")
+    else:
+        survey_data = user_input.get('survey', {})
+        if isinstance(survey_data, str):
+            try:
+                survey_data = json.loads(survey_data)
+            except:
+                pass
 
     inputs = {"survey_data": survey_data, "image_paths": []}
     result = hobby_graph.invoke(inputs)
