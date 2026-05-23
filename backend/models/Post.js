@@ -6,6 +6,11 @@ const postSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     title: {
       type: String,
       required: true,
