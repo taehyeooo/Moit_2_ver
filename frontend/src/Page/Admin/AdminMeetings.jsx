@@ -12,7 +12,7 @@ const AdminMeetings = () => {
 
     const fetchMeetings = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/admin/meetings', { withCredentials: true });
+            const response = await axios.get('/api/admin/meetings', { withCredentials: true });
             setMeetings(response.data);
         } catch (error) {
             console.error("모임 목록 로드 실패:", error);
@@ -34,7 +34,7 @@ const AdminMeetings = () => {
 
         if (result.isConfirmed) {
             try {
-                await axios.delete(`http://localhost:3000/api/admin/meetings/${id}`, { withCredentials: true });
+                await axios.delete(`/api/admin/meetings/${id}`, { withCredentials: true });
                 setMeetings(meetings.filter(meeting => meeting._id !== id));
                 Swal.fire('삭제됨', '모임이 삭제되었습니다.', 'success');
             } catch (error) {

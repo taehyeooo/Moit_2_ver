@@ -10,7 +10,7 @@ const QnABoard = () => {
     useEffect(() => {
         const fetchQnA = async () => {
             try {
-                const response = await axios.get('http://localhost:3000/api/contact/qna');
+                const response = await axios.get('/api/contact/qna');
                 setQnaList(response.data);
             } catch (error) {
                 console.error("QnA 로딩 실패:", error);

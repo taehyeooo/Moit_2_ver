@@ -42,7 +42,7 @@ const SinglePost = () => {
   useEffect(() => {
     const fetchPost = async () => {
       try {
-        const postResponse = await axios.get(`http://localhost:3000/api/post/${id}`);
+        const postResponse = await axios.get(`/api/post/${id}`);
         setPost(postResponse.data);
       } catch (error) {
         console.error("게시글 로딩 실패:", error);
@@ -128,7 +128,7 @@ const SinglePost = () => {
 
         <Box sx={{ my: 4 }}>
           <div
-            dangerouslySetInnerHTML={{ __html: post.renderedContent }}
+            dangerouslySetInnerHTML={{ __html: post.content }}
             style={{ lineHeight: 1.8, fontSize: '1.1rem', wordBreak: 'break-all' }}
           />
         </Box>

@@ -27,7 +27,7 @@ const AdminDashboard = () => {
         const fetchStats = async () => {
             try {
                 // 👇 [수정됨] 백엔드 API 경로를 '/api/admin/dashboard-stats'로 변경
-                const response = await axios.get('http://localhost:3000/api/admin/dashboard-stats', { withCredentials: true });
+                const response = await axios.get('/api/admin/dashboard-stats', { withCredentials: true });
                 setStats(response.data);
             } catch (error) {
                 console.error("통계 데이터 로딩 실패:", error);

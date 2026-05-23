@@ -12,8 +12,8 @@ const Board = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/post");
-        setPosts(response.data);
+        const response = await axios.get("/api/post");
+        setPosts(response.data.posts || []);
       } catch (error) {
         console.error("게시글을 불러오는 중 오류 발생:", error);
       }

@@ -10,8 +10,8 @@ const Forum = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/post");
-        setPosts(response.data.slice(0, 5));
+        const response = await axios.get("/api/post");
+        setPosts((response.data.posts || []).slice(0, 5));
       } catch (error) {
         console.log("게시글 로딩 실패: ", error);
       } finally {

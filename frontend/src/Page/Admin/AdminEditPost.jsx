@@ -21,7 +21,7 @@ const AdminEditPost = () => {
   useEffect(() => {
     const fetchPost = async () => {
       try {
-        const response = await axios.get(`http://localhost:3000/api/post/${id}`);
+        const response = await axios.get(`/api/post/${id}`);
 
         setFormData({
           title: response.data.title,
@@ -80,7 +80,7 @@ const AdminEditPost = () => {
           fileFormData.append("originalName", encodedFileName);
 
           const response = await axios.post(
-            "http://localhost:3000/api/upload/file",
+            "/api/upload/file",
             fileFormData,
             {
               withCredentials: true,
@@ -109,7 +109,7 @@ const AdminEditPost = () => {
         currentImages: currentImages,
       };
 
-      await axios.put(`http://localhost:3000/api/post/${id}`, postData, {
+      await axios.put(`/api/post/${id}`, postData, {
         withCredentials: true,
         headers: {
           "Content-Type": "application/json",
@@ -241,7 +241,7 @@ const AdminEditPost = () => {
                     formData.append("image", blobInfo.blob());
 
                     const response = await axios.post(
-                      "http://localhost:3000/api/upload/image",
+                      "/api/upload/image",
                       formData,
                       {
                         withCredentials: true,

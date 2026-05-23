@@ -22,7 +22,7 @@ const AdminContacts = () => {
   useEffect(() => {
     const fetchContacts = async () => {
       try {
-        const response = await axios.get("http://localhost:3000/api/admin/contacts", {
+        const response = await axios.get("/api/admin/contacts", {
           withCredentials: true,
         });
         setContacts(response.data);
@@ -37,7 +37,7 @@ const AdminContacts = () => {
   const handleStatusUpdate = async (newStatus) => {
     if (!selectedContact) return;
     try {
-      await axios.put(`http://localhost:3000/api/admin/contacts/${selectedContact._id}`,
+      await axios.put(`/api/admin/contacts/${selectedContact._id}`,
         { status: newStatus },
         { withCredentials: true }
       );
@@ -57,7 +57,7 @@ const AdminContacts = () => {
   const handleReplySubmit = async () => {
     if (!selectedContact || !replyText.trim()) return;
     try {
-        await axios.put(`http://localhost:3000/api/admin/contacts/${selectedContact._id}/reply`,
+        await axios.put(`/api/admin/contacts/${selectedContact._id}/reply`,
             { reply: replyText },
             { withCredentials: true }
         );
@@ -90,7 +90,7 @@ const AdminContacts = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:3000/api/admin/contacts/${id}`, {
+        await axios.delete(`/api/admin/contacts/${id}`, {
           withCredentials: true,
         });
         setContacts(contacts.filter(contact => contact._id !== id));

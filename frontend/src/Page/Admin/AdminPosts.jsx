@@ -17,10 +17,10 @@ const AdminPosts = () => {
       try {
         setLoading(true);
         // ❗ API 경로를 백엔드(index.js)와 일치시킵니다.
-        const response = await axios.get("http://localhost:3000/api/posts", {
+        const response = await axios.get("/api/post", {
           withCredentials: true,
         });
-        setPosts(response.data);
+        setPosts(response.data.posts || []);
       } catch (error) {
         console.error("게시글 가져오기 실패:", error);
         Swal.fire("오류", "게시글을 불러오는 중 문제가 발생했습니다.", "error");
@@ -46,7 +46,7 @@ const AdminPosts = () => {
     if (result.isConfirmed) {
       try {
         // ❗ 지적해주신 대로 API 경로를 '/api/posts/'로 올바르게 수정했습니다.
-        await axios.delete(`http://localhost:3000/api/posts/${id}`, {
+        await axios.delete(`/api/post/${id}`, {
           withCredentials: true
         });
         setPosts(posts.filter(post => post._id !== id));

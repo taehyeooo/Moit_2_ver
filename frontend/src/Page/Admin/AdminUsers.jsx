@@ -12,7 +12,7 @@ const AdminUsers = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await axios.get('http://localhost:3000/api/admin/users', { withCredentials: true });
+            const response = await axios.get('/api/admin/users', { withCredentials: true });
             setUsers(response.data);
         } catch (error) {
             console.error("사용자 목록 로드 실패:", error);
@@ -34,7 +34,7 @@ const AdminUsers = () => {
 
         if (result.isConfirmed) {
             try {
-                await axios.delete(`http://localhost:3000/api/admin/users/${id}`, { withCredentials: true });
+                await axios.delete(`/api/admin/users/${id}`, { withCredentials: true });
                 setUsers(users.filter(user => user._id !== id));
                 Swal.fire('삭제됨', '사용자가 삭제되었습니다.', 'success');
             } catch (error) {
