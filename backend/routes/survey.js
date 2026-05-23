@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
 const axios = require('axios');
 const SurveyResult = require('../models/SurveyResult');
 const User = require('../models/User');
 const { verifyToken } = require('../utils/auth');
 const { isMockMode, MOCK_SURVEY_RESPONSE } = require('../utils/mockAI');
+const upload = require('../middleware/upload');
 
 // 기존 설문 결과 조회
 router.get('/', verifyToken, async (req, res) => {
@@ -40,21 +42,37 @@ router.post('/', verifyToken, async (req, res) => {
     }
 });
 
-// AI 서버에 추천 요청
-router.post('/recommend', verifyToken, async (req, res) => {
+// AI 서버에 추천 요청 (사진 선택 첨부 가능)
+router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) => {
     try {
         // 목 모드
         if (isMockMode()) {
             console.log("[MOCK] 취미 추천 목 데이터 반환");
+            if (req.file) fs.unlinkSync(req.file.path); // 임시 파일 정리
             return res.json(MOCK_SURVEY_RESPONSE);
         }
 
-        const { answers } = req.body;
         const aiBaseUrl = process.env.AI_SERVER_URL || 'http://localhost:8000';
 
-        // 변환 없이 원본 응답을 그대로 전달 — 변환 책임은 AI 서버(utils/survey.py)가 담당
+        // FormData 전송 시 answers가 JSON 문자열로 옴, JSON 전송 시 객체로 옴
+        const rawAnswers = req.body.answers;
+        const answers = typeof rawAnswers === 'string'
+            ? JSON.parse(rawAnswers)
+            : rawAnswers;
+
+        const payload = { survey_raw: answers };
+
+        // 사진이 첨부된 경우 base64로 변환하여 AI 서버에 전달
+        if (req.file) {
+            const imageBuffer = fs.readFileSync(req.file.path);
+            payload.image_base64_list = [imageBuffer.toString('base64')];
+            fs.unlinkSync(req.file.path); // 전송 후 임시 파일 삭제
+            console.log(`사진 첨부 감지 — base64 변환 완료 (${req.file.originalname})`);
+        }
+
+        // 변환 책임은 AI 서버(utils/survey.py)가 담당
         const agentResponse = await axios.post(`${aiBaseUrl}/agent/invoke`, {
-            user_input: { survey_raw: answers }
+            user_input: payload
         });
 
         let finalAnswer = agentResponse.data.final_answer;
@@ -75,6 +93,9 @@ router.post('/recommend', verifyToken, async (req, res) => {
         res.json(finalAnswer);
 
     } catch (error) {
+        if (req.file) {
+            try { fs.unlinkSync(req.file.path); } catch (_) {}
+        }
         if (axios.isAxiosError(error)) {
             if (error.response) {
                 return res.status(500).json({ message: `AI 에이전트 오류: ${error.response.status}` });

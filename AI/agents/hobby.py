@@ -2,11 +2,17 @@
 취미 추천 에이전트
 
 설문 49문항 → 5차원 심리 프로파일 정규화 → Gemini 멀티모달 분석 → 취미 3개 JSON 반환
+
+이미지 입력 방식:
+  - image_paths: 로컬 파일 경로 리스트 (서버 내부 경로)
+  - image_base64_list: base64 인코딩 문자열 리스트 (프론트엔드 업로드)
 """
 
 import json
+import base64
 import logging
-from typing import List, TypedDict
+from io import BytesIO
+from typing import List, TypedDict, Optional
 
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
@@ -15,7 +21,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from utils.survey import convert_raw_answers
 
-# Gemini 초기화
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -100,23 +105,23 @@ def analyze_survey_tool(survey_json_string: str) -> dict:
             return int(val) if val is not None else None
 
         # FSC — 현실적 제약
-        f['FSC']['time_availability']     = normalize(to_int('1'), 1, 4)
-        f['FSC']['financial_budget']      = normalize(to_int('2'), 1, 4)
-        f['FSC']['energy_level']          = normalize(to_int('3'), 1, 5)
-        f['FSC']['mobility']              = normalize(to_int('4'), 1, 5)
+        f['FSC']['time_availability']        = normalize(to_int('1'), 1, 4)
+        f['FSC']['financial_budget']         = normalize(to_int('2'), 1, 4)
+        f['FSC']['energy_level']             = normalize(to_int('3'), 1, 5)
+        f['FSC']['mobility']                 = normalize(to_int('4'), 1, 5)
         f['FSC']['has_physical_constraints'] = to_int('5') in [1, 2, 3]
         f['FSC']['has_housing_constraints']  = to_int('12') in [2, 3, 4]
-        f['FSC']['preferred_space']       = 'indoor' if to_int('6') == 1 else 'outdoor'
+        f['FSC']['preferred_space']          = 'indoor' if to_int('6') == 1 else 'outdoor'
 
         # PSSR — 심리적 상태
         q13 = to_int('13') or 3
         q14_r = 6 - (to_int('14') or 3)
         q16 = to_int('16') or 3
-        f['PSSR']['self_criticism_score'] = normalize((q13 + q14_r + q16) / 3, 1, 5)
+        f['PSSR']['self_criticism_score']      = normalize((q13 + q14_r + q16) / 3, 1, 5)
         q15 = to_int('15') or 3
         q18 = to_int('18') or 3
         q20 = to_int('20') or 3
-        f['PSSR']['social_anxiety_score'] = normalize((q15 + q18 + q20) / 3, 1, 5)
+        f['PSSR']['social_anxiety_score']      = normalize((q15 + q18 + q20) / 3, 1, 5)
         f['PSSR']['isolation_level']           = normalize(to_int('21'), 1, 5)
         f['PSSR']['structure_preference_score']= normalize(to_int('27'), 1, 5)
         f['PSSR']['avoidant_coping_score']     = normalize(to_int('29'), 1, 5)
@@ -142,7 +147,7 @@ def analyze_survey_tool(survey_json_string: str) -> dict:
         return {}
 
 
-# ─── 사진 분석 Tool ──────────────────────────────────────
+# ─── Gemini 호출 (재시도 포함) ───────────────────────────
 
 @retry(
     stop=stop_after_attempt(3),
@@ -159,40 +164,40 @@ def _call_gemini_with_retry(model, prompt_text: str, image_parts: list) -> str:
     return response.text
 
 
-@tool
-def analyze_photo_tool(image_paths: list[str], survey_profile: dict) -> str:
-    """사용자 사진과 설문 프로파일을 바탕으로 Gemini가 취미를 추천합니다."""
+def _decode_images(image_paths: List[str], image_base64_list: List[str]) -> list:
+    """
+    로컬 파일 경로와 base64 문자열을 PIL Image 리스트로 변환합니다.
+
+    Args:
+        image_paths: 서버 로컬 파일 경로 리스트
+        image_base64_list: 프론트엔드에서 전송된 base64 인코딩 이미지 리스트
+    """
     from PIL import Image
-    logging.info("--- 사진 분석 및 추천 생성 시작 ---")
+    parts = []
 
-    try:
-        prompt_text = generate_prompt(survey_profile)
-    except Exception:
-        prompt_text = "사용자에게 알맞은 취미를 추천해주세요."
-
-    image_parts = []
     for path in (image_paths or []):
         try:
-            image_parts.append(Image.open(path))
+            parts.append(Image.open(path))
         except Exception as e:
             logging.warning(f"이미지 로드 실패: {path} — {e}")
 
-    try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        return _call_gemini_with_retry(model, prompt_text, image_parts)
-    except Exception as e:
-        logging.error(f"Gemini 호출 최종 실패 (3회 재시도 소진): {e}")
-        return json.dumps({
-            "summary": "AI 모델 연결에 일시적인 문제가 발생했습니다. API 키와 접근 권한을 확인해주세요.",
-            "recommendations": []
-        }, ensure_ascii=False)
+    for b64 in (image_base64_list or []):
+        try:
+            img_bytes = base64.b64decode(b64)
+            parts.append(Image.open(BytesIO(img_bytes)))
+            logging.info("base64 이미지 디코딩 완료")
+        except Exception as e:
+            logging.warning(f"base64 이미지 디코딩 실패 — {e}")
+
+    return parts
 
 
 # ─── HobbyAgent SubGraph ─────────────────────────────────
 
 class HobbyAgentState(TypedDict):
     survey_data: dict
-    image_paths: List[str]
+    image_paths: List[str]           # 서버 로컬 파일 경로
+    image_base64_list: List[str]     # 프론트엔드 업로드 base64 이미지
     survey_profile: dict
     final_recommendation: str
 
@@ -204,10 +209,29 @@ def analyze_survey_node(state: HobbyAgentState):
 
 
 def analyze_photo_node(state: HobbyAgentState):
-    result = analyze_photo_tool.invoke({
-        "image_paths": state.get("image_paths", []),
-        "survey_profile": state.get("survey_profile", {})
-    })
+    logging.info("--- 사진 분석 및 추천 생성 시작 ---")
+
+    image_parts = _decode_images(
+        state.get("image_paths", []),
+        state.get("image_base64_list", [])
+    )
+
+    if image_parts:
+        logging.info(f"이미지 {len(image_parts)}장 Gemini에 전달")
+    else:
+        logging.info("업로드된 이미지 없음 — 설문 데이터만으로 추천")
+
+    try:
+        prompt_text = generate_prompt(state.get("survey_profile", {}))
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        result = _call_gemini_with_retry(model, prompt_text, image_parts)
+    except Exception as e:
+        logging.error(f"Gemini 호출 최종 실패 (3회 재시도 소진): {e}")
+        result = json.dumps({
+            "summary": "AI 모델 연결에 일시적인 문제가 발생했습니다. API 키와 접근 권한을 확인해주세요.",
+            "recommendations": []
+        }, ensure_ascii=False)
+
     return {"final_recommendation": result}
 
 
@@ -224,9 +248,9 @@ hobby_graph = _hobby_builder.compile()
 
 def call_multimodal_hobby_agent(state: dict) -> dict:
     logging.info("--- CALLING: Hobby Agent ---")
-    user_input  = state['user_input']
+    user_input = state['user_input']
 
-    # survey_raw: 원본 응답 → 변환 / survey: 이미 변환된 데이터
+    # 설문 데이터 변환
     if 'survey_raw' in user_input:
         survey_data = convert_raw_answers(user_input['survey_raw'])
     else:
@@ -237,5 +261,9 @@ def call_multimodal_hobby_agent(state: dict) -> dict:
             except Exception:
                 pass
 
-    result = hobby_graph.invoke({"survey_data": survey_data, "image_paths": []})
+    result = hobby_graph.invoke({
+        "survey_data": survey_data,
+        "image_paths": [],
+        "image_base64_list": user_input.get("image_base64_list", []),
+    })
     return {"final_answer": result.get('final_recommendation', "")}
