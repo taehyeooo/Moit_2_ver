@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 const CreateMeeting = () => {
     const [formData, setFormData] = useState({
         title: '',
-        category: '운동', // 기본값 설정
+        category: '취미 및 여가', // 기본값 설정
         description: '',
         location: '',
         maxParticipants: 10, // 기본값
@@ -207,8 +207,7 @@ const CreateMeeting = () => {
         }
     };
 
-    // (참고) PHP 폼에 있던 카테고리들
-    const categories = ['운동', '여행', '음악', '게임', '요리', '독서', '공예', '사진', '기타'];
+    const categories = ['취미 및 여가', '운동 및 액티비티', '성장 및 배움', '문화 및 예술', '푸드 및 드링크', '여행 및 탐방', '봉사 및 참여'];
 
     return (
         <div className="bg-gray-50 py-32">
@@ -244,7 +243,7 @@ const CreateMeeting = () => {
                         <label htmlFor="category" className="block text-sm font-medium text-gray-700">카테고리</label>
                         <select name="category" id="category" required
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                            onChange={handleChange} value={formData.category}>
+                            onChange={handleChange} value={formData.category || categories[0]}>
                             {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                     </div>
