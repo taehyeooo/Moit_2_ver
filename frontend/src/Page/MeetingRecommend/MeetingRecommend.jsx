@@ -8,15 +8,8 @@ import { FaCalendarAlt, FaMapMarkerAlt, FaUsers, FaSpinner } from 'react-icons/f
 // Meetings.jsx의 카드와 유사하지만, 추천 페이지 내에서 사용하기 위해 별도로 정의합니다.
 // (백엔드 Meeting.js 모델에 추가한 필드들을 모두 사용합니다)
 const MeetingCard = ({ meeting }) => {
-    // 이미지가 없을 경우를 대비한 기본 이미지
-    const defaultImage = 'https://via.placeholder.com/400x250.png?text=MOIT';
-    
-    // 백엔드에서 '/uploads/image.png'와 같은 상대 경로로 이미지 URL을 제공한다고 가정
-    const imageUrl = meeting.imageUrl ? meeting.imageUrl : defaultImage;
-
-    // 날짜 포맷팅 (meetingTime이 유효한 Date 문자열이라고 가정)
-    const formattedDate = meeting.meetingTime 
-        ? new Date(meeting.meetingTime).toLocaleString('ko-KR', {
+    const formattedDate = meeting.date
+        ? new Date(meeting.date).toLocaleString('ko-KR', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
@@ -31,13 +24,17 @@ const MeetingCard = ({ meeting }) => {
             className="block bg-white shadow-lg rounded-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 ease-in-out transform hover:-translate-y-1"
         >
             {/* 1. 이미지 영역 */}
-            <div className="relative h-48 w-full">
-                <img 
-                    src={imageUrl} 
-                    alt={meeting.title} 
-                    className="w-full h-full object-cover" 
-                    onError={(e) => { e.target.src = defaultImage; }} // 이미지 로드 실패 시 기본 이미지
-                />
+            <div className="relative h-48 w-full bg-gray-100">
+                {meeting.coverImage ? (
+                    <img
+                        src={meeting.coverImage}
+                        alt={meeting.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">이미지 없음</div>
+                )}
                 <span className="absolute top-3 left-3 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">
                     {meeting.category}
                 </span>
@@ -68,7 +65,7 @@ const MeetingCard = ({ meeting }) => {
                     <div className="flex items-center gap-2">
                         <FaUsers className="text-blue-500 flex-shrink-0" />
                         <span>
-                            {meeting.members.length} / {meeting.maxParticipants || '제한 없음'}명
+                            {meeting.participants?.length || 0} / {meeting.maxParticipants || '제한 없음'}명
                         </span>
                     </div>
                 </div>
@@ -134,8 +131,8 @@ const MeetingRecommend = () => {
                     <div className="text-center text-blue-600 bg-blue-50 p-8 rounded-lg shadow">
                         <h3 className="font-bold text-xl mb-4">{error}</h3>
                         <p className="mb-6">AI 추천을 받기 위해 상세 취미 설문을 먼저 완료해주세요.</p>
-                        <Link 
-                            to="/hobby-recommend" 
+                        <Link
+                            to="/recommend"
                             className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             설문조사 하러 가기

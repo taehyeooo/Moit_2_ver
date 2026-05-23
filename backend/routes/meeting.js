@@ -48,6 +48,21 @@ router.get('/closing-soon', async (req, res) => {
     }
 });
 
+// 사용자 맞춤 모임 추천 (취미 프로필 기반, 목 모드에서는 최신 모임 반환)
+router.get('/recommend', verifyToken, async (req, res) => {
+    try {
+        const meetings = await Meeting.find()
+            .populate('host', 'nickname')
+            .populate('participants', 'nickname')
+            .sort({ createdAt: -1 })
+            .limit(6);
+        res.json(meetings);
+    } catch (error) {
+        console.error("모임 추천 에러:", error);
+        res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+    }
+});
+
 // 특정 모임 상세 조회
 router.get('/:id', async (req, res) => {
     try {
