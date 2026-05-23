@@ -17,9 +17,6 @@ const categories = [
     { name: '봉사 및 참여', icon: FaHeart },
 ];
 
-// 백엔드 기본 URL 정의
-const BACKEND_BASE_URL = 'http://localhost:3000';
-const DEFAULT_CARD_IMAGE_URL = 'https://via.placeholder.com/400x250.png?text=MOIT+No+Image'; // 카드용 대체 이미지
 
 export default function Meetings() {
   const [meetings, setMeetings] = useState([]); 
@@ -228,28 +225,20 @@ function MeetingCard({ meeting, isAiResult, navigate }) {
     }
   };
 
-  // 👈 [이미지 로드 로직] 백엔드 URL과 상대 경로를 결합합니다.
-  const coverImage = meeting.coverImage;
-  const imageSource = coverImage && coverImage.startsWith('/uploads') 
-    ? `${BACKEND_BASE_URL}${coverImage}` // 백엔드 URL과 상대 경로 결합
-    : DEFAULT_CARD_IMAGE_URL; // 대체 이미지 사용
-
   return (
-    <div 
+    <div
       onClick={() => navigate(`/meetings/${meeting._id}`)}
       className={`group relative cursor-pointer bg-white rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl border ${
         isAiResult ? 'border-blue-400 ring-2 ring-blue-100 shadow-lg shadow-blue-100' : 'border-gray-200 shadow-sm'
       }`}
     >
       <div className="relative h-48 overflow-hidden bg-gray-100">
-        {/* meeting.coverImage 대신 imageSource 사용 */}
-        {imageSource !== DEFAULT_CARD_IMAGE_URL ? (
+        {meeting.coverImage ? (
           <img
-            src={imageSource}
+            src={meeting.coverImage}
             alt={meeting.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            // 이미지 로드 실패 시 대체 이미지 로드
-            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CARD_IMAGE_URL; }}
+            onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400 bg-slate-100">

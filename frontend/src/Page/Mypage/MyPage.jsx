@@ -144,7 +144,7 @@ export default function MyPage() {
                                     <h3 className="text-xl font-bold text-gray-800">AI가 분석한 추천 취미</h3>
                                     <p className="text-gray-500 text-sm mt-1">최근 설문을 바탕으로 추천된 결과입니다.</p>
                                 </div>
-                                <Link to="/hobby-recommend" className="text-sm text-blue-600 hover:underline font-medium">
+                                <Link to="/recommend" className="text-sm text-blue-600 hover:underline font-medium">
                                     다시 분석하기 →
                                 </Link>
                             </div>
@@ -182,11 +182,11 @@ export default function MyPage() {
                             </div>
                         </div>
                     ) : (
-                        <EmptyState 
-                            message="아직 취미 성향 분석을 하지 않으셨네요!" 
+                        <EmptyState
+                            message="아직 취미 성향 분석을 하지 않으셨네요!"
                             subMessage="AI에게 나만의 맞춤 취미를 추천받아보세요."
-                            link="/hobby-recommend" 
-                            linkText="취미 추천 받으러 가기" 
+                            link="/recommend"
+                            linkText="취미 추천 받으러 가기"
                         />
                     )
                 )}
