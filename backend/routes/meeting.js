@@ -93,16 +93,19 @@ router.get('/:id', async (req, res) => {
 
 // 새로운 모임 생성
 router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) => {
-    const { title, description, category, location, date, maxParticipants } = req.body;
+    const { title, description, category, location, date, time, maxParticipants } = req.body;
     const host = req.user.userId;
     const coverImage = req.file ? `/uploads/${req.file.filename}` : undefined;
+
+    // date + time 합산 (예: "2024-01-15" + "14:30" → "2024-01-15T14:30")
+    const combinedDate = date && time ? new Date(`${date}T${time}`) : new Date(date);
 
     try {
         // 목 모드: AI 호출 없이 바로 생성
         if (isMockMode()) {
             console.log("[MOCK] AI 호출 없이 모임 바로 생성");
             const newMeeting = new Meeting({
-                title, description, coverImage, category, location, date, maxParticipants,
+                title, description, coverImage, category, location, date: combinedDate, maxParticipants,
                 host, participants: [host]
             });
             const savedMeeting = await newMeeting.save();
@@ -113,7 +116,7 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
         const agentResponse = await axios.post(`${AI_AGENT_URL}/agent/invoke`, {
             user_input: {
                 title, description,
-                time: new Date(date).toLocaleString('ko-KR'),
+                time: combinedDate.toLocaleString('ko-KR'),
                 location
             }
         });
@@ -149,7 +152,7 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
         }
 
         const newMeeting = new Meeting({
-            title, description, coverImage, category, location, date, maxParticipants,
+            title, description, coverImage, category, location, date: combinedDate, maxParticipants,
             host, participants: [host]
         });
         const savedMeeting = await newMeeting.save();
@@ -177,12 +180,13 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
 // AI 추천 무시하고 강제 생성
 router.post('/force-create', verifyToken, upload.single('meetingImage'), async (req, res) => {
     try {
-        const { title, description, category, location, date, maxParticipants, tempCoverImage } = req.body;
+        const { title, description, category, location, date, time, maxParticipants, tempCoverImage } = req.body;
         const host = req.user.userId;
         const finalCoverImage = req.file ? `/uploads/${req.file.filename}` : tempCoverImage;
+        const combinedDate = date && time ? new Date(`${date}T${time}`) : new Date(date);
 
         const newMeeting = new Meeting({
-            title, description, coverImage: finalCoverImage, category, location, date, maxParticipants,
+            title, description, coverImage: finalCoverImage, category, location, date: combinedDate, maxParticipants,
             host, participants: [host]
         });
         const savedMeeting = await newMeeting.save();
