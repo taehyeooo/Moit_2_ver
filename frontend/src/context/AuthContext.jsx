@@ -29,7 +29,9 @@ export const AuthProvider = ({ children }) => {
     checkUserStatus();
   }, []); // ❗ 의존성 배열을 비워 이 효과가 컴포넌트가 처음 마운트될 때 한 번만 실행되도록 합니다.
 
-  const value = { user, setUser, loading };
+  const logout = () => setUser(null);
+
+  const value = { user, setUser, logout, loading };
 
   return (
     <AuthContext.Provider value={value}>

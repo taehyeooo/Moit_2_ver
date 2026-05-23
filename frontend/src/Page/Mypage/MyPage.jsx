@@ -4,9 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { FaUserCircle, FaCalendarAlt, FaMapMarkerAlt, FaUsers, FaStar, FaHistory } from 'react-icons/fa';
 
-// 👈 [추가] 백엔드 기본 URL 및 카드용 기본 이미지 URL 정의
-const BACKEND_BASE_URL = 'http://localhost:3000';
-const DEFAULT_CARD_IMAGE_URL = 'https://via.placeholder.com/400x250.png?text=MOIT+No+Image';
+const DEFAULT_CARD_IMAGE_URL = null;
 
 export default function MyPage() {
     const { user, logout } = useAuth();
@@ -205,27 +203,22 @@ function MeetingCard({ meeting }) {
     };
 
     // 👈 [핵심 수정 부분] 이미지 URL 생성
-    const coverImage = meeting.coverImage;
-    const imageSource = coverImage && coverImage.startsWith('/uploads') 
-        ? `${BACKEND_BASE_URL}${coverImage}` // 백엔드 URL과 상대 경로 결합
-        : DEFAULT_CARD_IMAGE_URL; // 대체 이미지 사용
+    const imageSource = meeting.coverImage || DEFAULT_CARD_IMAGE_URL;
 
     return (
         <Link to={`/meetings/${meeting._id}`} className="block group">
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
                 <div className="h-40 bg-gray-100 relative overflow-hidden">
-                    {/* 👇 --- [수정] imageSource 변수를 사용하여 이미지 표시 --- 👇 */}
-                    {imageSource !== DEFAULT_CARD_IMAGE_URL ? (
-                        <img 
-                            src={imageSource} 
-                            alt={meeting.title} 
-                            className="w-full h-full object-cover" 
-                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CARD_IMAGE_URL; }}
+                    {imageSource ? (
+                        <img
+                            src={imageSource}
+                            alt={meeting.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.onerror = null; e.target.src = ''; e.target.style.display = 'none'; }}
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400 bg-slate-100">이미지 없음</div>
                     )}
-                    {/* 👆 ----------------------------------------------------- 👆 */}
                     <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
                         {meeting.category}
                     </div>
