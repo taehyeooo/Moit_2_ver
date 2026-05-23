@@ -7,13 +7,19 @@ const upload = require('../middleware/upload');
 // 게시글 작성 (이미지 포함 가능)
 router.post('/', verifyToken, upload.array('images', 5), async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, fileUrl } = req.body;
         const files = req.files;
 
         const lastPost = await Post.findOne().sort({ number: -1 });
         const nextNumber = lastPost ? lastPost.number + 1 : 1;
 
-        const fileUrls = files ? files.map(file => `/uploads/${file.filename}`) : [];
+        // multer로 직접 올린 파일 OR 미리 업로드된 URL(AdminCreatePost 방식) 모두 지원
+        let fileUrls = files && files.length > 0
+            ? files.map(file => `/uploads/${file.filename}`)
+            : [];
+        if (fileUrl) {
+            fileUrls = Array.isArray(fileUrl) ? fileUrl : [fileUrl];
+        }
 
         const newPost = new Post({ number: nextNumber, title, content, fileUrl: fileUrls, author: req.user.userId });
         await newPost.save();
