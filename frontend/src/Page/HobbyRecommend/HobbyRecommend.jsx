@@ -572,9 +572,11 @@ const HobbyRecommend = () => {
         setRecommendations(results);
 
         try {
-            await axios.post('/api/survey', { 
-                answers, 
-                recommendations: results 
+            const answersToSave = { ...answers };
+            delete answersToSave.Q49_photo; // FileList는 JSON 직렬화 불가 → 제외
+            await axios.post('/api/survey', {
+                answers: answersToSave,
+                recommendations: results
             }, { withCredentials: true });
         } catch (saveError) {
             console.error("결과 저장 실패 (화면에는 표시됨):", saveError);

@@ -6,22 +6,9 @@ import { FaUsers, FaMapMarkerAlt, FaCalendarAlt, FaChevronLeft, FaRegListAlt, Fa
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
 
-// [추가] 백엔드 기본 URL과 대체 이미지 URL 정의
-const BACKEND_BASE_URL = 'http://localhost:3000';
-const DEFAULT_IMAGE_URL = 'https://via.placeholder.com/1280x320.png?text=No+Cover+Image';
-
 const formatDate = (dateString) => {
     const options = { month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false };
     return new Intl.DateTimeFormat('ko-KR', options).format(new Date(dateString));
-};
-
-// [추가] 상대 경로를 절대 경로로 변환하는 함수
-const getFullImageUrl = (imagePath) => {
-    if (!imagePath) return DEFAULT_IMAGE_URL;
-    if (imagePath.startsWith('/uploads')) {
-        return `${BACKEND_BASE_URL}${imagePath}`;
-    }
-    return imagePath;
 };
 
 const MeetingDetail = () => {
@@ -112,9 +99,6 @@ const MeetingDetail = () => {
     const remainingSpots = meeting.maxParticipants - meeting.participants.length;
     const isHost = user && meeting && user._id === meeting.host._id;
 
-    // 👈 [핵심 수정 부분] 이미지 URL 생성
-    const imageSource = getFullImageUrl(meeting.coverImage); 
-    
     return (
         <div className="bg-white pt-24 pb-12 min-h-screen">
             <div className="container mx-auto max-w-6xl px-4">
@@ -124,14 +108,16 @@ const MeetingDetail = () => {
                 </button>
 
                 <div className="w-full h-80 bg-gray-200 rounded-lg overflow-hidden mb-8">
-                    {/* 👇 --- [수정] imageSource 변수를 사용하여 이미지 표시 --- 👇 */}
-                    <img 
-                        src={imageSource} 
-                        alt={meeting.title} 
-                        className="w-full h-full object-cover" 
-                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_IMAGE_URL; }} // 이미지 로드 오류 시 대체 이미지 강제
-                    />
-                    {/* 👆 ----------------------------------------------------- 👆 */}
+                    {meeting.coverImage ? (
+                        <img
+                            src={meeting.coverImage}
+                            alt={meeting.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg">이미지 없음</div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
