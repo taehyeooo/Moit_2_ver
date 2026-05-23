@@ -66,7 +66,7 @@ router.get('/:id', async (req, res) => {
 // 게시글 수정
 router.put('/:id', verifyToken, async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, fileUrl } = req.body;
         const post = await Post.findById(req.params.id);
         if (!post) return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
 
@@ -78,6 +78,9 @@ router.put('/:id', verifyToken, async (req, res) => {
 
         post.title = title;
         post.content = content;
+        if (fileUrl !== undefined) {
+            post.fileUrl = Array.isArray(fileUrl) ? fileUrl : [fileUrl];
+        }
         post.updatedAt = Date.now();
         await post.save();
 

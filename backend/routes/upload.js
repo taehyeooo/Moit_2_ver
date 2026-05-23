@@ -14,6 +14,28 @@ router.post('/', verifyToken, upload.single('file'), (req, res) => {
     }
 });
 
+// 첨부파일 업로드 (AdminCreatePost/AdminEditPost용)
+router.post('/file', verifyToken, upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: '파일이 업로드되지 않았습니다.' });
+        res.json({ fileUrl: `/uploads/${req.file.filename}` });
+    } catch (error) {
+        console.error("파일 업로드 에러:", error);
+        res.status(500).json({ message: '파일 업로드 중 오류가 발생했습니다.' });
+    }
+});
+
+// 인라인 이미지 업로드 (TinyMCE 에디터용)
+router.post('/image', verifyToken, upload.single('image'), (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: '이미지가 업로드되지 않았습니다.' });
+        res.json({ imageUrl: `/uploads/${req.file.filename}` });
+    } catch (error) {
+        console.error("이미지 업로드 에러:", error);
+        res.status(500).json({ message: '이미지 업로드 중 오류가 발생했습니다.' });
+    }
+});
+
 // 다중 파일 업로드
 router.post('/multiple', verifyToken, upload.array('files', 5), (req, res) => {
     try {
