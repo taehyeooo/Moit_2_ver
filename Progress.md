@@ -16,7 +16,14 @@
   - [x] AI 목 데이터 모드 적용 (USE_MOCK_AI=true)
   - [x] AI 스마트 검색 → MongoDB 텍스트 검색 폴백
 
+- [x] AI 서버 v1.0 → v2.0 리팩토링 (포폴 품질)
+  - [x] 설문 변환 로직 분리 (`AI/utils/survey.py`)
+  - [x] 단일 파일 → 모듈 분리 (`agents/hobby.py`, `agents/search.py`, `agents/master.py`)
+  - [x] Tenacity 재시도 로직 (`_call_gemini_with_retry`, `_run_agent_with_retry`)
+  - [x] 멀티모달 사진 업로드 파이프라인 완성 (프론트 → 백엔드 → AI 서버)
+
 ### 📋 Todo
+- [ ] 프론트엔드: 설문 화면에 사진 첨부 UI 추가 (FormData로 /api/survey/recommend 요청)
 - [ ] Python AI 서버 연동 (API 키 발급 후: OpenAI, Gemini, Pinecone, Tavily)
 - [ ] CLAUDE.md 프로젝트 컨텍스트 작성
 - [ ] v2.0 기능 개발 시작

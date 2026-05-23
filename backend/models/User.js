@@ -16,8 +16,11 @@ const userSchema = mongoose.Schema({
     isActive: { type: Boolean, default: true }, // 로그인 체크용
     isLoggedIn: { type: Boolean, default: false },
     ipAddress: { type: String },
+    surveyResult: { type: mongoose.Schema.Types.ObjectId, ref: 'SurveyResult', default: null },
     surveyProfile: { type: mongoose.Schema.Types.Mixed, default: {} },
-    hobbyRecommendation: { type: mongoose.Schema.Types.Mixed, default: null }
+    hobbyRecommendation: { type: mongoose.Schema.Types.Mixed, default: null },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lastLoginAttempt: { type: Date, default: null }
 });
 
 // 비밀번호 암호화 (회원가입 시 자동 실행)

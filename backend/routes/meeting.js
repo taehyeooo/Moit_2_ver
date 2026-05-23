@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     try {
         const meetings = await Meeting.find()
             .populate('host', 'nickname')
-            .populate('participants')
+            .populate('participants', 'nickname')
             .sort({ createdAt: -1 });
         res.json(meetings);
     } catch (error) {
@@ -291,7 +291,7 @@ router.post('/ai-search', async (req, res) => {
                 ]
             })
             .populate('host', 'nickname')
-            .populate('participants')
+            .populate('participants', 'nickname')
             .sort({ createdAt: -1 })
             .limit(10);
 
