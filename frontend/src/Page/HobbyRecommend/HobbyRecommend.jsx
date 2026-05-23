@@ -526,17 +526,27 @@ const HobbyRecommend = () => {
     }, [user]); // user가 로드되면 초기 로직 실행
 
     const getAiRecommendations = async (answers) => {
-        // ... (API 호출 로직 생략)
         try {
             console.log("AI에게 취미 추천 요청 보내는 중...");
 
             const textAnswers = { ...answers };
-            delete textAnswers.Q49_photo; 
+            const photoFiles = textAnswers.Q49_photo; // FileList
+            delete textAnswers.Q49_photo;
+
+            const formData = new FormData();
+            formData.append('answers', JSON.stringify(textAnswers));
+
+            // 사진이 있으면 첫 번째 파일을 'photo' 필드로 첨부
+            if (photoFiles && photoFiles.length > 0) {
+                formData.append('photo', photoFiles[0]);
+                console.log(`사진 첨부: ${photoFiles[0].name}`);
+            }
 
             const response = await axios.post(
-                '/api/survey/recommend', 
-                { answers: textAnswers }, 
+                '/api/survey/recommend',
+                formData,
                 { withCredentials: true }
+                // Content-Type은 axios가 FormData 감지 후 자동 설정
             );
 
             return response.data.recommendations || [];

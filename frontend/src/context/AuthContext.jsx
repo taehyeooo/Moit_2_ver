@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     const checkUserStatus = async () => {
       try {
         const tokenResponse = await axios.post(
-          "http://localhost:3000/api/auth/verify-token",
+          "/api/auth/verify-token",
           {},
           { withCredentials: true }
         );
