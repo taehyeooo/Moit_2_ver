@@ -267,16 +267,16 @@ router.post('/:id/join', verifyToken, async (req, res) => {
         if (meeting.participants.length >= meeting.maxParticipants) {
             return res.status(400).json({ message: '모집 인원이 가득 찼습니다.' });
         }
-        if (meeting.participants.includes(req.user.userId)) {
+        if (meeting.participants.map(p => p.toString()).includes(req.user.userId)) {
             return res.status(400).json({ message: '이미 참여하고 있는 모임입니다.' });
         }
 
-        meeting.participants.push(req.user.userId);
-        await meeting.save();
-
-        const updatedMeeting = await Meeting.findById(req.params.id)
-            .populate('host', 'nickname')
-            .populate('participants', 'nickname');
+        // save() 후 재조회 대신 $addToSet 원자적 업데이트 + populate 한 번에 처리 (DB 왕복 1회 절감)
+        const updatedMeeting = await Meeting.findByIdAndUpdate(
+            req.params.id,
+            { $addToSet: { participants: req.user.userId } },
+            { new: true }
+        ).populate('host', 'nickname').populate('participants', 'nickname');
 
         res.json({ message: '모임 참여 신청이 완료되었습니다.', meeting: updatedMeeting });
     } catch (error) {
@@ -293,16 +293,16 @@ router.post('/:id/leave', verifyToken, async (req, res) => {
         if (meeting.host.toString() === req.user.userId) {
             return res.status(400).json({ message: '호스트는 모임을 떠날 수 없습니다. 모임을 삭제해주세요.' });
         }
+        if (!meeting.participants.map(p => p.toString()).includes(req.user.userId)) {
+            return res.status(400).json({ message: '참여하고 있는 모임이 아닙니다.' });
+        }
 
-        const idx = meeting.participants.indexOf(req.user.userId);
-        if (idx === -1) return res.status(400).json({ message: '참여하고 있는 모임이 아닙니다.' });
-
-        meeting.participants.splice(idx, 1);
-        await meeting.save();
-
-        const updatedMeeting = await Meeting.findById(req.params.id)
-            .populate('host', 'nickname')
-            .populate('participants', 'nickname');
+        // save() 후 재조회 대신 $pull 원자적 업데이트 + populate 한 번에 처리 (DB 왕복 1회 절감)
+        const updatedMeeting = await Meeting.findByIdAndUpdate(
+            req.params.id,
+            { $pull: { participants: req.user.userId } },
+            { new: true }
+        ).populate('host', 'nickname').populate('participants', 'nickname');
 
         res.json({ message: '모임 참여가 취소되었습니다.', meeting: updatedMeeting });
     } catch (error) {
