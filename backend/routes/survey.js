@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
+const fsp = require('fs').promises;
 const axios = require('axios');
 const SurveyResult = require('../models/SurveyResult');
 const User = require('../models/User');
@@ -48,7 +49,7 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
         // 목 모드
         if (isMockMode()) {
             console.log("[MOCK] 취미 추천 목 데이터 반환");
-            if (req.file) fs.unlinkSync(req.file.path); // 임시 파일 정리
+            if (req.file) await fsp.unlink(req.file.path).catch(() => {}); // 임시 파일 정리
             return res.json(MOCK_SURVEY_RESPONSE);
         }
 
@@ -64,9 +65,9 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
 
         // 사진이 첨부된 경우 base64로 변환하여 AI 서버에 전달
         if (req.file) {
-            const imageBuffer = fs.readFileSync(req.file.path);
+            const imageBuffer = await fsp.readFile(req.file.path);
             payload.image_base64_list = [imageBuffer.toString('base64')];
-            fs.unlinkSync(req.file.path); // 전송 후 임시 파일 삭제
+            await fsp.unlink(req.file.path).catch(() => {}); // 전송 후 임시 파일 삭제
             console.log(`사진 첨부 감지 — base64 변환 완료 (${req.file.originalname})`);
         }
 
@@ -94,7 +95,7 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
 
     } catch (error) {
         if (req.file) {
-            try { fs.unlinkSync(req.file.path); } catch (_) {}
+            await fsp.unlink(req.file.path).catch(() => {});
         }
         if (axios.isAxiosError(error)) {
             if (error.response) {
