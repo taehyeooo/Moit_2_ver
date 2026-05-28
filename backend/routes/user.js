@@ -81,7 +81,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: '사용자 이름과 비밀번호를 모두 입력해주세요.' });
     }
 
-    const user = await User.findOne({ username }).select('+password +password_hash');
+    const user = await User.findOne({ username }).select('+password');
     if (!user) {
       return res.status(401).json({ message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
     }
@@ -90,12 +90,7 @@ router.post('/login', async (req, res) => {
         return res.status(403).json({ message: '비활성화된 계정입니다. 관리자에게 문의하세요.' });
     }
 
-    const hashToCompare = user.password || user.password_hash;
-    if (!hashToCompare) {
-        return res.status(500).json({ message: '계정에 비밀번호 정보가 없어 로그인할 수 없습니다.' });
-    }
-
-    const isValidPassword = await bcrypt.compare(password, hashToCompare);
+    const isValidPassword = await bcrypt.compare(password, user.password);
     
     if (!isValidPassword) {
       user.failedLoginAttempts += 1;
@@ -116,11 +111,6 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    if (user.password_hash && !user.password) {
-        user.password = user.password_hash;
-        user.password_hash = undefined;
-    }
-
     user.failedLoginAttempts = 0;
     user.lastLoginAttempt = new Date();
     user.isLoggedIn = true;
