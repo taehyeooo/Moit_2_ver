@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Post = require('../models/Post');
+const Counter = require('../models/Counter');
 const { verifyToken } = require('../utils/auth');
 const upload = require('../middleware/upload');
 
@@ -10,8 +11,7 @@ router.post('/', verifyToken, upload.array('images', 5), async (req, res) => {
         const { title, content, fileUrl } = req.body;
         const files = req.files;
 
-        const lastPost = await Post.findOne().sort({ number: -1 });
-        const nextNumber = lastPost ? lastPost.number + 1 : 1;
+        const nextNumber = await Counter.nextSeq('post');
 
         // multer로 직접 올린 파일 OR 미리 업로드된 URL(AdminCreatePost 방식) 모두 지원
         let fileUrls = files && files.length > 0

@@ -3,8 +3,9 @@ const router = express.Router();
 const User = require('../models/User');
 const Post = require('../models/Post'); // Post 모델 가져오기
 // 👇 [핵심] Contact 모델은 객체로 export 되므로 중괄호 {}로 감싸서 가져와야 합니다.
-const { Contact } = require('../models/Contact'); 
+const { Contact } = require('../models/Contact');
 const Meeting = require('../models/Meeting');
+const Counter = require('../models/Counter');
 const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs");
 
@@ -163,8 +164,7 @@ router.put('/contacts/:id/reply', verifyAdmin, async (req, res) => {
 
         // 2. [핵심] 답변 내용을 바탕으로 새로운 게시글(Post) 자동 생성
         // 제목은 문의자의 이름이나 내용을 요약해서 만들고, 내용은 Q&A 형식으로 저장합니다.
-        const lastPost = await Post.findOne().sort({ number: -1 });
-        const nextNumber = lastPost ? lastPost.number + 1 : 1;
+        const nextNumber = await Counter.nextSeq('post');
 
         // HTML 줄바꿈 처리
         const formattedMessage = contact.message.replace(/\n/g, '<br>');
