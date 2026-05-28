@@ -87,8 +87,7 @@ router.put('/:id', verifyToken, async (req, res) => {
         if (fileUrl !== undefined) {
             post.fileUrl = Array.isArray(fileUrl) ? fileUrl : [fileUrl];
         }
-        post.updatedAt = Date.now();
-        await post.save();
+        await post.save(); // timestamps: true가 updatedAt 자동 갱신
 
         res.json({ message: '게시글이 수정되었습니다.', post });
     } catch (error) {

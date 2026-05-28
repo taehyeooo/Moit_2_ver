@@ -5,6 +5,7 @@ const postSchema = new mongoose.Schema(
     number: {
       type: Number,
       required: true,
+      unique: true,
     },
     author: {
       type: mongoose.Schema.Types.ObjectId,
@@ -20,33 +21,17 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
     fileUrl: {
       type: [String],
-      trim: true,
+      default: [],
     },
     views: {
       type: Number,
       default: 0,
     },
-    viewLogs: [{
-      ip: String,
-      userAgent: String,
-      timestamp: {
-        type: Date,
-        default: Date.now
-      }
-    }],
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    }
   },
   {
-    timestamps: true,
+    timestamps: true, // createdAt, updatedAt 자동 관리
   }
 );
 
