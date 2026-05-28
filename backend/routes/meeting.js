@@ -8,14 +8,34 @@ const upload = require('../middleware/upload');
 
 const AI_AGENT_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 
-// 모든 모임 목록 조회
+// 모든 모임 목록 조회 (페이지네이션 지원)
 router.get('/', async (req, res) => {
     try {
-        const meetings = await Meeting.find()
-            .populate('host', 'nickname')
-            .populate('participants', 'nickname')
-            .sort({ createdAt: -1 });
-        res.json(meetings);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const [meetings, total] = await Promise.all([
+            Meeting.find()
+                .populate('host', 'nickname')
+                .populate('participants', 'nickname')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Meeting.countDocuments()
+        ]);
+
+        // 쿼리 파라미터 없이 호출하면 기존처럼 배열 반환 (프론트 호환성 유지)
+        if (!req.query.page && !req.query.limit) {
+            return res.json(meetings);
+        }
+
+        res.json({
+            meetings,
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            total
+        });
     } catch (error) {
         res.status(500).json({ message: '서버 오류가 발생했습니다.' });
     }

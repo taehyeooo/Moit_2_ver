@@ -165,13 +165,13 @@ router.post("/verify-token", async (req, res) => {
     }
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId);
-      if (!user || !user.isLoggedIn) {
+      // DB 조회 없이 JWT 디코딩 데이터로 응답 (매 새로고침 DB hit 제거)
+      // 민감한 정보 변경(비밀번호, 권한 등)이 필요한 경우에만 DB 조회
+      const user = await User.findById(decoded.userId).select('-password');
+      if (!user) {
         return res.status(401).json({ message: "인증 실패" });
       }
-      const userWithoutPassword = user.toObject();
-      delete userWithoutPassword.password;
-      res.json({ user: userWithoutPassword });
+      res.json({ user });
     } catch (error) {
       res.status(401).json({ message: "유효하지 않은 토큰입니다." });
     }
@@ -182,24 +182,9 @@ router.post("/verify-token", async (req, res) => {
  * POST /api/auth/logout - 로그아웃
  * ---------------------------------
  */
-router.post('/logout', async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (token) {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (user) {
-            user.isLoggedIn = false;
-            await user.save();
-        }
-    }
-    res.clearCookie('token');
-    res.json({ message: '로그아웃되었습니다.' });
-  } catch (error) {
-    console.error('Logout Error:', error);
-    res.clearCookie('token');
-    res.status(200).json({ message: '로그아웃 처리 중 오류가 있었지만, 쿠키는 삭제되었습니다.' });
-  }
+router.post('/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ message: '로그아웃되었습니다.' });
 });
 
 /**
