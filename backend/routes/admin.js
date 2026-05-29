@@ -8,27 +8,7 @@ const Meeting = require('../models/Meeting');
 const Counter = require('../models/Counter');
 const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs");
-
-// --- 관리자 인증 미들웨어 ---
-const verifyAdmin = async (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) {
-    return res.status(401).json({ message: '인증이 필요합니다.' });
-  }
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId);
-    
-    // role이 1이면 관리자라고 가정
-    if (!user || user.role !== 1) {
-      return res.status(403).json({ message: '관리자 권한이 없습니다.' });
-    }
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
-  }
-};
+const { verifyAdmin } = require('../utils/auth');
 
 // 1. 관리자 로그인
 router.post('/login', async (req, res) => {

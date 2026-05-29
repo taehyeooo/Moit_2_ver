@@ -111,13 +111,11 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    user.failedLoginAttempts = 0;
-    user.lastLoginAttempt = new Date();
-    user.isLoggedIn = true;
-    
-    user.ipAddress = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip;
-    
-    await user.save();
+    // 로그인 성공 시 실패 횟수 초기화만 업데이트 (전체 문서 save() 불필요)
+    await User.findByIdAndUpdate(user._id, {
+        failedLoginAttempts: 0,
+        lastLoginAttempt: new Date()
+    });
 
     // 토큰에 role 정보도 포함하면 프론트엔드에서 활용하기 좋습니다 (선택사항)
     const token = jwt.sign(

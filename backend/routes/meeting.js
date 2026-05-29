@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
 const axios = require('axios');
 const Meeting = require('../models/Meeting');
 const { verifyToken } = require('../utils/auth');
@@ -249,6 +251,13 @@ router.delete('/:id', verifyToken, async (req, res) => {
             } catch (aiError) {
                 console.error("Pinecone 모임 삭제 오류:", aiError.message);
             }
+        }
+
+        if (meeting.coverImage) {
+            const filePath = path.join(__dirname, '..', meeting.coverImage);
+            fs.unlink(filePath, (err) => {
+                if (err) console.error('이미지 파일 삭제 실패:', err.message);
+            });
         }
 
         await Meeting.findByIdAndDelete(meetingId);
