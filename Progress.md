@@ -5,7 +5,7 @@
 # 🚀 MOIT v2.0 Backend & AI - Progress Tracker
 
 > **목적:** AI와의 대화 시 토큰 절약 및 프로젝트 상태 동기화를 위한 핵심 문서
-> **마지막 업데이트:** 2026-05-29 — 관리자 미들웨어 통합 + 모임 삭제 이미지 정리
+> **마지막 업데이트:** 2026-05-30 — AI 서버 axios 타임아웃 + survey/meeting To-Do 재검토
 
 ## 📌 현재 개발 목표 (Current Sprint)
 - Node.js 백엔드 코드의 기술 부채(하드코딩, 중복 코드) 해결
@@ -31,12 +31,13 @@
 ## ⏳ 대기 중인 작업 (To-Do)
 
 **[백엔드 (Node.js) 리팩토링]**
-- [ ] `survey.js` 내 중복 정의된 JWT 인증 로직 제거 및 `utils/auth.js` 미들웨어로 일괄 통합
+- [x] `survey.js` JWT 중복 — 이미 `utils/auth.js`의 `verifyToken` 사용 중 (코드 확인 완료)
 
 **[AI 파이프라인 (Node.js ↔ FastAPI) 고도화]**
-- [ ] 프론트엔드에서 업로드한 일상 사진을 백엔드를 거쳐 AI 서버(Gemini)로 전송하는 파이프라인 완성
+- [x] 사진 파이프라인 — `survey.js`에서 이미 base64 변환 후 AI 서버 전송 구현됨 (코드 확인 완료)
 - [x] AI 서버 `tenacity` Retry 로직 실적용 — `hobby.py`(Gemini), `search.py`(OpenAI) 이미 완료, `master.py` 라우터 LLM에 2회 재시도 추가
 - [x] AI 서버 타임아웃 설정 — `master.py` (10s), `search.py` (30s) ChatOpenAI timeout 추가
+- [x] 백엔드 → AI 서버 axios 타임아웃 추가 — `survey.js` (60s), `meeting.js` agent/invoke (30s), meetings/add (10s), meetings/delete (10s)
 
 ## 🛠️ 환경 변수 상태 (.env) - (실제 값은 로컬에만 보관)
 **Backend (`backend/.env`)**

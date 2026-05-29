@@ -74,7 +74,7 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
         // 변환 책임은 AI 서버(utils/survey.py)가 담당
         const agentResponse = await axios.post(`${aiBaseUrl}/agent/invoke`, {
             user_input: payload
-        });
+        }, { timeout: 60000 }); // Gemini 멀티모달 처리 고려 60초
 
         let finalAnswer = agentResponse.data.final_answer;
 

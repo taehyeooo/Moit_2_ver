@@ -141,7 +141,7 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
                 time: combinedDate.toLocaleString('ko-KR'),
                 location
             }
-        });
+        }, { timeout: 30000 });
 
         const aiResponseText = agentResponse.data.final_answer;
         let recommendations;
@@ -186,7 +186,7 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
                 description: savedMeeting.description,
                 time: new Date(savedMeeting.date).toLocaleString('ko-KR'),
                 location: savedMeeting.location
-            });
+            }, { timeout: 10000 });
         } catch (aiError) {
             console.error("Pinecone 모임 추가 오류:", aiError.message);
         }
@@ -247,7 +247,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
         if (!isMockMode()) {
             try {
-                await axios.delete(`${AI_AGENT_URL}/meetings/delete/${meetingId}`);
+                await axios.delete(`${AI_AGENT_URL}/meetings/delete/${meetingId}`, { timeout: 10000 });
             } catch (aiError) {
                 console.error("Pinecone 모임 삭제 오류:", aiError.message);
             }
@@ -355,7 +355,7 @@ router.post('/ai-search', async (req, res) => {
                 description: "스마트 검색 요청입니다.",
                 time: "", location: ""
             }
-        });
+        }, { timeout: 30000 });
 
         const aiResult = agentResponse.data.final_answer;
         if (!aiResult) return res.json({ summary: "검색 결과가 없습니다.", results: [] });
