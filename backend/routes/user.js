@@ -191,12 +191,11 @@ router.get('/mypage', verifyToken, async (req, res) => {
       return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     }
 
-    const hostedMeetings = await Meeting.find({ host: userId }).sort({ date: -1 });
-    
-    const joinedMeetings = await Meeting.find({ 
-      participants: userId, 
-      host: { $ne: userId } 
-    }).sort({ date: -1 });
+    // 두 쿼리가 독립적이므로 Promise.all로 병렬 조회 (순차 → 동시 실행)
+    const [hostedMeetings, joinedMeetings] = await Promise.all([
+      Meeting.find({ host: userId }).sort({ date: -1 }),
+      Meeting.find({ participants: userId, host: { $ne: userId } }).sort({ date: -1 })
+    ]);
 
     res.json({
       user,
