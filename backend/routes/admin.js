@@ -84,9 +84,27 @@ router.get('/auth', verifyAdmin, (req, res) => {
     });
 });
 
-// 3. 전체 사용자 목록 조회
+// 3. 전체 사용자 목록 조회 (페이지네이션 지원, 미지정 시 전체 반환으로 호환성 유지)
 router.get('/users', verifyAdmin, async (req, res) => {
     try {
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
+
+        if (page && limit) {
+            const skip = (page - 1) * limit;
+            const [users, total] = await Promise.all([
+                User.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit),
+                User.countDocuments()
+            ]);
+            return res.json({
+                users,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                total
+            });
+        }
+
+        // 쿼리 파라미터 없을 때 기존 방식 유지 (프론트 호환성)
         const users = await User.find({}).sort({ createdAt: -1 });
         res.json(users);
     } catch (error) {
@@ -104,9 +122,27 @@ router.delete('/users/:id', verifyAdmin, async (req, res) => {
     }
 });
 
-// 4. 전체 게시글 목록 조회
+// 4. 전체 게시글 목록 조회 (페이지네이션 지원, 미지정 시 전체 반환으로 호환성 유지)
 router.get('/posts', verifyAdmin, async (req, res) => {
     try {
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
+
+        if (page && limit) {
+            const skip = (page - 1) * limit;
+            const [posts, total] = await Promise.all([
+                Post.find({}).sort({ createdAt: -1 }).skip(skip).limit(limit),
+                Post.countDocuments()
+            ]);
+            return res.json({
+                posts,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                total
+            });
+        }
+
+        // 쿼리 파라미터 없을 때 기존 방식 유지 (프론트 호환성)
         const posts = await Post.find({}).sort({ createdAt: -1 });
         res.json(posts);
     } catch (error) {
