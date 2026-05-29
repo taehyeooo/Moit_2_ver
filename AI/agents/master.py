@@ -16,11 +16,12 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from agents.hobby import call_multimodal_hobby_agent
 from agents.search import call_general_search_agent
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+llm = ChatOpenAI(model="gpt-4o-mini", timeout=10)
 
 _router_prompt = ChatPromptTemplate.from_template(
     """당신은 사용자의 요청을 분석하여 어떤 담당자에게 전달할지 결정하는 AI 라우터입니다.
@@ -32,6 +33,20 @@ _router_prompt = ChatPromptTemplate.from_template(
 """
 )
 _router_chain = _router_prompt | llm | StrOutputParser()
+
+
+@retry(
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=1, max=5),
+    retry=retry_if_exception_type(Exception),
+    before_sleep=lambda rs: logging.warning(
+        f"라우터 LLM 호출 실패 — {rs.attempt_number}회 재시도 중... ({rs.outcome.exception()})"
+    )
+)
+def _invoke_router(user_input) -> str:
+    """라우팅 LLM 호출 — 일시적 오류 시 최대 2회 재시도."""
+    decision = _router_chain.invoke({"user_input": user_input})
+    return decision.strip().lower().replace("'", "").replace('"', '')
 
 
 class MasterAgentState(TypedDict):
@@ -50,10 +65,9 @@ def route_request(state: MasterAgentState) -> dict:
         return {"route": "hobby_recommendation"}
 
     try:
-        decision = _router_chain.invoke({"user_input": user_input})
-        route = decision.strip().lower().replace("'", "").replace('"', '')
+        route = _invoke_router(user_input)
     except Exception as e:
-        logging.error(f"라우팅 오류: {e}")
+        logging.error(f"라우팅 오류 (2회 재시도 소진): {e}")
         route = "general_search"
 
     logging.info(f"라우팅 결정: {route}")

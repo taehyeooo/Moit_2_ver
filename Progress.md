@@ -35,8 +35,8 @@
 
 **[AI 파이프라인 (Node.js ↔ FastAPI) 고도화]**
 - [ ] 프론트엔드에서 업로드한 일상 사진을 백엔드를 거쳐 AI 서버(Gemini)로 전송하는 파이프라인 완성
-- [ ] 백엔드의 설문 변환 로직(하드코딩)을 유연한 구조로 개선
-- [ ] AI 서버(`main.py`)에 `tenacity` 라이브러리를 활용한 API 호출 재시도(Retry) 로직 실적용
+- [x] AI 서버 `tenacity` Retry 로직 실적용 — `hobby.py`(Gemini), `search.py`(OpenAI) 이미 완료, `master.py` 라우터 LLM에 2회 재시도 추가
+- [x] AI 서버 타임아웃 설정 — `master.py` (10s), `search.py` (30s) ChatOpenAI timeout 추가
 
 ## 🛠️ 환경 변수 상태 (.env) - (실제 값은 로컬에만 보관)
 **Backend (`backend/.env`)**

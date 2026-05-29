@@ -18,7 +18,7 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain.tools.retriever import create_retriever_tool
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+llm = ChatOpenAI(model="gpt-4o-mini", timeout=30)
 
 
 @tool
