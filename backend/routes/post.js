@@ -56,11 +56,13 @@ router.get('/', async (req, res) => {
 // 특정 게시글 조회
 router.get('/:id', async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id);
+        // $inc 원자적 연산으로 조회수 증가 + 문서 반환을 한 번에 처리 (findById + save 2회 → 1회)
+        const post = await Post.findByIdAndUpdate(
+            req.params.id,
+            { $inc: { views: 1 } },
+            { new: true }
+        );
         if (!post) return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
-
-        post.views += 1;
-        await post.save();
 
         res.json(post);
     } catch (error) {
