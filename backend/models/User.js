@@ -5,7 +5,7 @@ const userSchema = mongoose.Schema({
     username: { type: String, unique: true },
     name: { type: String, maxlength: 50 },
     email: { type: String, trim: true, unique: true },
-    password: { type: String, minlength: 5 },
+    password: { type: String, minlength: 5, select: false },
     nickname: { type: String, maxlength: 50 }, // nickname 필드 추가
     lastname: { type: String, maxlength: 50 },
     role: { type: Number, default: 0 },

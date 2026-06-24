@@ -35,6 +35,8 @@ const postSchema = new mongoose.Schema(
   }
 );
 
+postSchema.index({ createdAt: -1 }); // 최신순 목록 조회 최적화
+
 const Post = mongoose.model("Post", postSchema);
 
 module.exports = Post;
