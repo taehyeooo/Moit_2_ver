@@ -88,6 +88,7 @@ router.get('/users', verifyAdmin, async (req, res) => {
         const users = await User.find({}).sort({ createdAt: -1 });
         res.json(users);
     } catch (error) {
+        console.error("Admin Users Fetch Error:", error);
         res.status(500).json({ message: '사용자 목록 조회 실패' });
     }
 });
@@ -98,6 +99,7 @@ router.delete('/users/:id', verifyAdmin, async (req, res) => {
         await User.findByIdAndDelete(req.params.id);
         res.json({ message: '사용자가 삭제되었습니다.' });
     } catch (error) {
+        console.error("Admin User Delete Error:", error);
         res.status(500).json({ message: '사용자 삭제 실패' });
     }
 });
@@ -126,6 +128,7 @@ router.get('/posts', verifyAdmin, async (req, res) => {
         const posts = await Post.find({}).sort({ createdAt: -1 });
         res.json(posts);
     } catch (error) {
+        console.error("Admin Posts Fetch Error:", error);
         res.status(500).json({ message: '게시글 목록 조회 실패' });
     }
 });
@@ -148,6 +151,7 @@ router.put('/contacts/:id', verifyAdmin, async (req, res) => {
         await Contact.findByIdAndUpdate(req.params.id, { status });
         res.json({ message: '상태가 변경되었습니다.' });
     } catch (error) {
+        console.error("Contact Status Update Error:", error);
         res.status(500).json({ message: '상태 변경 실패' });
     }
 });
@@ -158,6 +162,7 @@ router.delete('/contacts/:id', verifyAdmin, async (req, res) => {
         await Contact.findByIdAndDelete(req.params.id);
         res.json({ message: '문의사항이 삭제되었습니다.' });
     } catch (error) {
+        console.error("Contact Delete Error:", error);
         res.status(500).json({ message: '문의사항 삭제 실패' });
     }
 });
@@ -179,7 +184,7 @@ router.put('/contacts/:id/reply', verifyAdmin, async (req, res) => {
         }
 
         // 2. [핵심] 답변 내용을 바탕으로 새로운 게시글(Post) 자동 생성
-        // 제목은 문의자의 이름이나 내용을 요약해서 만들고, 내용은 Q&A 형식으로 저장합니다.
+        // Contact 업데이트는 이미 완료됐으므로 게시글 생성 실패 시 보상 로직으로 처리
         const nextNumber = await Counter.nextSeq('post');
 
         // HTML 줄바꿈 처리
@@ -188,7 +193,7 @@ router.put('/contacts/:id/reply', verifyAdmin, async (req, res) => {
 
         const newPost = new Post({
             number: nextNumber,
-            title: `[Q&A] ${contact.name}님의 문의에 대한 답변입니다.`, // 제목 자동 생성
+            title: `[Q&A] ${contact.name}님의 문의에 대한 답변입니다.`,
             content: `
                 <div style="padding: 10px; background-color: #f9f9f9; border-radius: 8px;">
                     <p><strong>Q. 문의 내용</strong></p>
@@ -199,11 +204,17 @@ router.put('/contacts/:id/reply', verifyAdmin, async (req, res) => {
                     <p><strong>A. 답변</strong></p>
                     <p style="color: #2563eb;">${formattedReply}</p>
                 </div>
-            `, // HTML 형식으로 저장 (에디터 호환)
-            fileUrl: [], // 첨부파일 없음
+            `,
+            fileUrl: [],
         });
 
-        await newPost.save();
+        try {
+            await newPost.save();
+        } catch (postError) {
+            // 게시글 생성 실패해도 답변 등록은 성공으로 처리 (보상 로직)
+            console.error(`[보상] Contact(${req.params.id}) 답변 등록 성공, 게시글 자동 생성 실패:`, postError.message);
+            return res.json({ message: '답변이 등록되었습니다. (게시글 자동 발행은 실패했습니다.)' });
+        }
 
         res.json({ message: '답변이 등록되고 게시글로 발행되었습니다.' });
     } catch (error) {
@@ -215,11 +226,14 @@ router.put('/contacts/:id/reply', verifyAdmin, async (req, res) => {
 // 6. 대시보드 통계 데이터 조회
 router.get('/dashboard-stats', verifyAdmin, async (req, res) => {
     try {
-        const userCount = await User.countDocuments();
-        const postCount = await Post.countDocuments();
-        const contactCount = await Contact.countDocuments();
-        const meetingCount = await Meeting.countDocuments();
-        
+        // 네 쿼리가 독립적이므로 Promise.all로 병렬 실행
+        const [userCount, postCount, contactCount, meetingCount] = await Promise.all([
+            User.countDocuments(),
+            Post.countDocuments(),
+            Contact.countDocuments(),
+            Meeting.countDocuments()
+        ]);
+
         res.json({
             userCount,
             postCount,
@@ -227,6 +241,7 @@ router.get('/dashboard-stats', verifyAdmin, async (req, res) => {
             meetingCount
         });
     } catch (error) {
+        console.error("Dashboard Stats Error:", error);
         res.status(500).json({ message: '통계 데이터 조회 실패' });
     }
 });
@@ -239,6 +254,7 @@ router.get('/meetings', verifyAdmin, async (req, res) => {
             .sort({ createdAt: -1 });
         res.json(meetings);
     } catch (error) {
+        console.error("Admin Meetings Fetch Error:", error);
         res.status(500).json({ message: '모임 목록 조회 실패' });
     }
 });
@@ -249,6 +265,7 @@ router.delete('/meetings/:id', verifyAdmin, async (req, res) => {
         await Meeting.findByIdAndDelete(req.params.id);
         res.json({ message: '모임이 삭제되었습니다.' });
     } catch (error) {
+        console.error("Admin Meeting Delete Error:", error);
         res.status(500).json({ message: '모임 삭제 실패' });
     }
 });
