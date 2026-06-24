@@ -6,6 +6,8 @@ const User = require('../models/User');
 const Meeting = require('../models/Meeting');
 const { verifyToken } = require('../utils/auth');
 
+const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24시간 (ms)
+
 /**
  * ---------------------------------
  * POST /api/auth/signup - 회원가입
@@ -128,7 +130,7 @@ router.post('/login', async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: TOKEN_MAX_AGE_MS,
     });
 
     const userWithoutPassword = user.toObject();

@@ -3,6 +3,27 @@ const router = express.Router();
 const fs = require('fs');
 const fsp = require('fs').promises;
 const axios = require('axios');
+
+/**
+ * axios 요청 실패 시 최대 maxRetries회 재시도.
+ * 네트워크 오류 또는 5xx 응답에만 재시도.
+ */
+async function axiosWithRetry(config, maxRetries = 2) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+            return await axios(config);
+        } catch (err) {
+            const isRetryable = !err.response || err.response.status >= 500;
+            if (!isRetryable || attempt > maxRetries) throw err;
+            lastError = err;
+            const delay = Math.min(1000 * attempt, 3000);
+            console.warn(`[AI 서버] 요청 실패 — ${attempt}회 재시도 중... (${delay}ms 후)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    throw lastError;
+}
 const SurveyResult = require('../models/SurveyResult');
 const User = require('../models/User');
 const { verifyToken } = require('../utils/auth');
@@ -72,9 +93,12 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
         }
 
         // 변환 책임은 AI 서버(utils/survey.py)가 담당
-        const agentResponse = await axios.post(`${aiBaseUrl}/agent/invoke`, {
-            user_input: payload
-        }, { timeout: 60000 }); // Gemini 멀티모달 처리 고려 60초
+        const agentResponse = await axiosWithRetry({
+            method: 'post',
+            url: `${aiBaseUrl}/agent/invoke`,
+            data: { user_input: payload },
+            timeout: 60000 // Gemini 멀티모달 처리 고려 60초
+        });
 
         let finalAnswer = agentResponse.data.final_answer;
 

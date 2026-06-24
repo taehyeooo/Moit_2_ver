@@ -223,7 +223,7 @@ def analyze_photo_node(state: HobbyAgentState):
 
     try:
         prompt_text = generate_prompt(state.get("survey_profile", {}))
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
         result = _call_gemini_with_retry(model, prompt_text, image_parts)
     except Exception as e:
         logging.error(f"Gemini 호출 최종 실패 (3회 재시도 소진): {e}")

@@ -5,21 +5,21 @@ const User = require('../models/User');
 
 router.get('/', async (req, res) => {
     try {
-        // 1. 총 모임 수 계산
-        const totalMeetings = await Meeting.countDocuments();
-
-        // 2. 가장 인기 있는 카테고리 찾기
-        const popularCategoryAgg = await Meeting.aggregate([
-            { $group: { _id: '$category', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 1 }
-        ]);
-        const popularCategory = popularCategoryAgg.length > 0 ? popularCategoryAgg[0]._id : '아직 없어요';
-
-        // 3. 최근 일주일간 가입한 새 멤버 수 계산
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const newUsersThisWeek = await User.countDocuments({ createdAt: { $gte: oneWeekAgo } });
+
+        // 세 쿼리가 독립적이므로 Promise.all로 병렬 실행
+        const [totalMeetings, popularCategoryAgg, newUsersThisWeek] = await Promise.all([
+            Meeting.countDocuments(),
+            Meeting.aggregate([
+                { $group: { _id: '$category', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 1 }
+            ]),
+            User.countDocuments({ createdAt: { $gte: oneWeekAgo } })
+        ]);
+
+        const popularCategory = popularCategoryAgg.length > 0 ? popularCategoryAgg[0]._id : '아직 없어요';
 
         res.json({
             totalMeetings,

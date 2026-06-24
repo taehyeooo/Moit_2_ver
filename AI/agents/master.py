@@ -21,7 +21,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from agents.hobby import call_multimodal_hobby_agent
 from agents.search import call_general_search_agent
 
-llm = ChatOpenAI(model="gpt-4o-mini", timeout=10)
+llm = ChatOpenAI(model="gpt-4o-mini", timeout=25)
 
 _router_prompt = ChatPromptTemplate.from_template(
     """당신은 사용자의 요청을 분석하여 어떤 담당자에게 전달할지 결정하는 AI 라우터입니다.
@@ -36,7 +36,7 @@ _router_chain = _router_prompt | llm | StrOutputParser()
 
 
 @retry(
-    stop=stop_after_attempt(2),
+    stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     retry=retry_if_exception_type(Exception),
     before_sleep=lambda rs: logging.warning(
@@ -44,7 +44,7 @@ _router_chain = _router_prompt | llm | StrOutputParser()
     )
 )
 def _invoke_router(user_input) -> str:
-    """라우팅 LLM 호출 — 일시적 오류 시 최대 2회 재시도."""
+    """라우팅 LLM 호출 — 일시적 오류 시 최대 3회 재시도."""
     decision = _router_chain.invoke({"user_input": user_input})
     return decision.strip().lower().replace("'", "").replace('"', '')
 
@@ -67,7 +67,7 @@ def route_request(state: MasterAgentState) -> dict:
     try:
         route = _invoke_router(user_input)
     except Exception as e:
-        logging.error(f"라우팅 오류 (2회 재시도 소진): {e}")
+        logging.error(f"라우팅 오류 (3회 재시도 소진): {e}")
         route = "general_search"
 
     logging.info(f"라우팅 결정: {route}")

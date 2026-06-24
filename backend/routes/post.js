@@ -38,8 +38,11 @@ router.get('/', async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        const posts = await Post.find().sort({ createdAt: -1 }).skip(skip).limit(limit);
-        const totalPosts = await Post.countDocuments();
+        // 두 쿼리가 독립적이므로 Promise.all로 병렬 실행
+        const [posts, totalPosts] = await Promise.all([
+            Post.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Post.countDocuments()
+        ]);
 
         res.json({
             posts,

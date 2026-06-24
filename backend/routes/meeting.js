@@ -10,6 +10,27 @@ const upload = require('../middleware/upload');
 
 const AI_AGENT_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 
+/**
+ * axios 요청 실패 시 최대 maxRetries회 재시도.
+ * 네트워크 오류 또는 5xx 응답에만 재시도.
+ */
+async function axiosWithRetry(config, maxRetries = 2) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+            return await axios(config);
+        } catch (err) {
+            const isRetryable = !err.response || err.response.status >= 500;
+            if (!isRetryable || attempt > maxRetries) throw err;
+            lastError = err;
+            const delay = Math.min(1000 * attempt, 3000);
+            console.warn(`[AI 서버] 요청 실패 — ${attempt}회 재시도 중... (${delay}ms 후)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    throw lastError;
+}
+
 // 모든 모임 목록 조회 (페이지네이션 지원)
 router.get('/', async (req, res) => {
     try {
@@ -135,13 +156,18 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
         }
 
         // AI 서버에 유사 모임 검색 요청
-        const agentResponse = await axios.post(`${AI_AGENT_URL}/agent/invoke`, {
-            user_input: {
-                title, description,
-                time: combinedDate.toLocaleString('ko-KR'),
-                location
-            }
-        }, { timeout: 30000 });
+        const agentResponse = await axiosWithRetry({
+            method: 'post',
+            url: `${AI_AGENT_URL}/agent/invoke`,
+            data: {
+                user_input: {
+                    title, description,
+                    time: combinedDate.toLocaleString('ko-KR'),
+                    location
+                }
+            },
+            timeout: 30000
+        });
 
         const aiResponseText = agentResponse.data.final_answer;
         let recommendations;
@@ -180,13 +206,18 @@ router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) =>
         const savedMeeting = await newMeeting.save();
 
         try {
-            await axios.post(`${AI_AGENT_URL}/meetings/add`, {
-                meeting_id: savedMeeting._id.toString(),
-                title: savedMeeting.title,
-                description: savedMeeting.description,
-                time: new Date(savedMeeting.date).toLocaleString('ko-KR'),
-                location: savedMeeting.location
-            }, { timeout: 10000 });
+            await axiosWithRetry({
+                method: 'post',
+                url: `${AI_AGENT_URL}/meetings/add`,
+                data: {
+                    meeting_id: savedMeeting._id.toString(),
+                    title: savedMeeting.title,
+                    description: savedMeeting.description,
+                    time: new Date(savedMeeting.date).toLocaleString('ko-KR'),
+                    location: savedMeeting.location
+                },
+                timeout: 10000
+            });
         } catch (aiError) {
             console.error("Pinecone 모임 추가 오류:", aiError.message);
         }
@@ -215,12 +246,17 @@ router.post('/force-create', verifyToken, upload.single('meetingImage'), async (
 
         if (!isMockMode()) {
             try {
-                await axios.post(`${AI_AGENT_URL}/meetings/add`, {
-                    meeting_id: savedMeeting._id.toString(),
-                    title: savedMeeting.title,
-                    description: savedMeeting.description,
-                    time: new Date(savedMeeting.date).toLocaleString('ko-KR'),
-                    location: savedMeeting.location
+                await axiosWithRetry({
+                    method: 'post',
+                    url: `${AI_AGENT_URL}/meetings/add`,
+                    data: {
+                        meeting_id: savedMeeting._id.toString(),
+                        title: savedMeeting.title,
+                        description: savedMeeting.description,
+                        time: new Date(savedMeeting.date).toLocaleString('ko-KR'),
+                        location: savedMeeting.location
+                    },
+                    timeout: 10000
                 });
             } catch (aiError) {
                 console.error("Pinecone 모임 추가 오류:", aiError.message);
@@ -247,7 +283,11 @@ router.delete('/:id', verifyToken, async (req, res) => {
 
         if (!isMockMode()) {
             try {
-                await axios.delete(`${AI_AGENT_URL}/meetings/delete/${meetingId}`, { timeout: 10000 });
+                await axiosWithRetry({
+                    method: 'delete',
+                    url: `${AI_AGENT_URL}/meetings/delete/${meetingId}`,
+                    timeout: 10000
+                });
             } catch (aiError) {
                 console.error("Pinecone 모임 삭제 오류:", aiError.message);
             }
@@ -349,13 +389,18 @@ router.post('/ai-search', async (req, res) => {
             });
         }
 
-        const agentResponse = await axios.post(`${AI_AGENT_URL}/agent/invoke`, {
-            user_input: {
-                title: query,
-                description: "스마트 검색 요청입니다.",
-                time: "", location: ""
-            }
-        }, { timeout: 30000 });
+        const agentResponse = await axiosWithRetry({
+            method: 'post',
+            url: `${AI_AGENT_URL}/agent/invoke`,
+            data: {
+                user_input: {
+                    title: query,
+                    description: "스마트 검색 요청입니다.",
+                    time: "", location: ""
+                }
+            },
+            timeout: 30000
+        });
 
         const aiResult = agentResponse.data.final_answer;
         if (!aiResult) return res.json({ summary: "검색 결과가 없습니다.", results: [] });
