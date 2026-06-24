@@ -121,7 +121,7 @@ router.post('/login', async (req, res) => {
 
     // 토큰에 role 정보도 포함하면 프론트엔드에서 활용하기 좋습니다 (선택사항)
     const token = jwt.sign(
-      { userId: user._id, username: user.username, nickname: user.nickname, role: user.role },
+      { userId: user._id, username: user.username, nickname: user.nickname, role: user.role, email: user.email, name: user.name },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );

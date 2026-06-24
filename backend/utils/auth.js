@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 
 const verifyToken = (req, res, next) => {
     const token = req.cookies.token;
@@ -8,25 +7,25 @@ const verifyToken = (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // 요청 객체에 사용자 정보(userId, username 등) 추가
+        req.user = decoded;
         next();
     } catch (error) {
         return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
     }
 };
 
-const verifyAdmin = async (req, res, next) => {
+// 토큰에 role이 포함되어 있으므로 DB 조회 없이 권한 확인 (매 요청 DB 왕복 제거)
+const verifyAdmin = (req, res, next) => {
     const token = req.cookies.token;
     if (!token) {
         return res.status(401).json({ message: '인증이 필요합니다.' });
     }
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (!user || user.role !== 1) {
+        if (decoded.role !== 1) {
             return res.status(403).json({ message: '관리자 권한이 없습니다.' });
         }
-        req.user = user;
+        req.user = decoded;
         next();
     } catch (error) {
         return res.status(401).json({ message: '유효하지 않은 토큰입니다.' });
