@@ -115,3 +115,253 @@ OpenAI Tools Agent(`create_openai_tools_agent`) 기반으로 3가지 도구를 �
 * **파이프라인 미완성:** 멀티모달(사진) 업로드 UI는 존재하나 AI 서버로의 실제 전송 파이프라인 미연결.
 * **보안 및 에러 핸들링 누락:** 계정 삭제 API 인증 가드 누락, 모임 삭제 시 서버 디스크 내 이미지 파일 잔존, AI 서버 재시도(Retry) 로직 부재.
 * **코드 중복:** 백엔드 내 인증 미들웨어 코드의 불필요한 인라인 중복 발생.
+
+---
+
+## 🔧 v2.0 (2026.06) : 기술 부채 해소 및 고도화
+
+> v1.0에서 지적된 한계점을 실제로 개선한 내역입니다.
+> 성능·안정성·보안·코드 품질 네 가지 축으로 분류했습니다.
+
+---
+
+### [성능] 1. 순차 DB 쿼리 → Promise.all 병렬 처리
+
+**문제**: 독립적인 DB 쿼리들을 `await`으로 순차 실행해 응답 지연 발생.
+적용 파일: `routes/stats.js`, `routes/post.js`, `routes/admin.js`
+
+```js
+// Before — 순차 실행 (총 대기 시간 = 쿼리1 + 쿼리2 + 쿼리3)
+const totalMeetings  = await Meeting.countDocuments();
+const popularCategory = await Meeting.aggregate([...]);
+const newUsersThisWeek = await User.countDocuments({ ... });
+
+// After — 병렬 실행 (총 대기 시간 = max(쿼리1, 쿼리2, 쿼리3))
+const [totalMeetings, popularCategory, newUsersThisWeek] = await Promise.all([
+    Meeting.countDocuments(),
+    Meeting.aggregate([...]),
+    User.countDocuments({ ... })
+]);
+```
+
+---
+
+### [성능] 2. Pinecone 연결 모듈 레벨 초기화
+
+**문제**: 검색 에이전트 호출마다 `_build_tools()`가 실행되어 Pinecone Vector Store가 매 요청마다 재연결됨.
+적용 파일: `AI/agents/search.py`
+
+```python
+# Before — 요청마다 Pinecone 재연결
+def call_general_search_agent(state):
+    tools = _build_tools()  # 매 요청 실행
+    executor = AgentExecutor(agent=..., tools=tools)
+
+# After — 서버 시작 시 1회만 초기화
+_TOOLS = _build_tools()  # 모듈 레벨
+
+def call_general_search_agent(state):
+    executor = AgentExecutor(agent=..., tools=_TOOLS)
+```
+
+---
+
+### [성능] 3. MongoDB 인덱스 추가
+
+**문제**: 자주 사용되는 정렬·필터 쿼리에 인덱스가 없어 컬렉션 풀스캔 발생.
+적용 파일: `models/Meeting.js`, `models/Post.js`, `models/Contact.js`
+
+```js
+// models/Meeting.js
+meetingSchema.index({ category: 1 });    // 유사 모임 검색
+meetingSchema.index({ date: 1 });        // 마감 임박 조회
+meetingSchema.index({ createdAt: -1 }); // 최신순 목록
+
+// models/Post.js
+postSchema.index({ createdAt: -1 });    // 최신순 목록
+
+// models/Contact.js
+contactSchema.index({ status: 1, repliedAt: -1 }); // Q&A 필터 + 정렬 복합 인덱스
+```
+
+---
+
+### [안정성] 4. AI 서버 axios retry 래퍼 도입
+
+**문제**: AI 서버(FastAPI) 호출 시 타임아웃만 있고 일시적 장애에 대한 재시도 로직 없음.
+적용 파일: `routes/meeting.js` (4곳), `routes/survey.js` (1곳)
+
+```js
+// Before — 실패 시 즉시 500 반환
+const res = await axios.post(`${AI_URL}/agent/invoke`, data, { timeout: 30000 });
+
+// After — 5xx·네트워크 오류 시 최대 2회 지수 백오프 재시도
+async function axiosWithRetry(config, maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        try {
+            return await axios(config);
+        } catch (err) {
+            const isRetryable = !err.response || err.response.status >= 500;
+            if (!isRetryable || attempt > maxRetries) throw err;
+            const delay = Math.min(1000 * attempt, 3000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
+const res = await axiosWithRetry({ method: 'post', url: `${AI_URL}/agent/invoke`, data, timeout: 30000 });
+```
+
+---
+
+### [안정성] 5. LLM 타임아웃 / retry 강화
+
+**문제**: 라우터 LLM 타임아웃 10초로 짧아 부하 시 타임아웃 빈발, retry 횟수 부족.
+적용 파일: `AI/agents/master.py`
+
+```python
+# Before
+llm = ChatOpenAI(model="gpt-4o-mini", timeout=10)
+@retry(stop=stop_after_attempt(2), ...)   # 최대 2회
+
+# After
+llm = ChatOpenAI(model="gpt-4o-mini", timeout=25)  # 25초로 증가
+@retry(stop=stop_after_attempt(3), ...)   # 최대 3회
+```
+
+---
+
+### [안정성] 6. 문의 답변 보상 로직 추가
+
+**문제**: 문의 답변 저장 성공 후 게시글 자동 생성이 실패하면 Contact는 업데이트됐는데 500 에러가 반환되는 상태 불일치 발생.
+적용 파일: `routes/admin.js`
+
+```js
+// Before — 게시글 저장 실패 시 답변 롤백 불가 → 불일치 상태
+await contact.update(...);
+await newPost.save();  // 실패하면 catch → 500 반환, Contact는 이미 업데이트됨
+
+// After — 보상 로직으로 상태 불일치 방지
+await contact.update(...);  // 핵심 작업 완료
+try {
+    await newPost.save();
+} catch (postError) {
+    console.error(`[보상] 답변 등록 성공, 게시글 자동 생성 실패:`, postError.message);
+    return res.json({ message: '답변이 등록되었습니다. (게시글 자동 발행은 실패했습니다.)' });
+}
+```
+
+---
+
+### [보안] 7. verifyAdmin DB 조회 제거
+
+**문제**: 관리자 미들웨어가 매 요청마다 `User.findById()`를 호출해 불필요한 DB 왕복 발생. JWT 토큰에 이미 `role`이 포함되어 있어 중복 조회.
+적용 파일: `utils/auth.js`
+
+```js
+// Before — 매 관리자 API 요청마다 DB 조회 1회
+const verifyAdmin = async (req, res, next) => {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);  // DB 왕복
+    if (!user || user.role !== 1) return res.status(403).json({ ... });
+    req.user = user;
+    next();
+};
+
+// After — 토큰 기반 처리 (DB 조회 없음)
+const verifyAdmin = (req, res, next) => {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 1) return res.status(403).json({ ... });
+    req.user = decoded;
+    next();
+};
+```
+
+---
+
+### [보안] 8. password 필드 기본 노출 차단
+
+**문제**: `User` 모델 `password` 필드가 모든 `find` 쿼리에 기본 포함되어 의도치 않은 데이터 노출 위험.
+적용 파일: `models/User.js`
+
+```js
+// Before — User.findById() 결과에 password 자동 포함
+password: { type: String, minlength: 5 }
+
+// After — 기본 제외, 필요 시 .select('+password') 명시
+password: { type: String, minlength: 5, select: false }
+```
+
+---
+
+### [코드품질] 9. User pre-save 훅 async/await 현대화 + 레거시 제거
+
+**문제**: 비밀번호 해싱 로직이 콜백 중첩(Callback Hell) 패턴. 미사용 레거시 메서드(`generateToken`, `findByToken`, `comparePassword`) 잔존.
+적용 파일: `models/User.js`
+
+```js
+// Before — 콜백 중첩
+userSchema.pre("save", function (next) {
+    if (user.isModified("password")) {
+        bcrypt.genSalt(10, function (err, salt) {
+            if (err) return next(err);
+            bcrypt.hash(user.password, salt, function (err, hash) {
+                if (err) return next(err);
+                user.password = hash;
+                next();
+            });
+        });
+    } else { next(); }
+});
+
+// After — async/await, 레거시 메서드 3개 제거
+userSchema.pre("save", async function () {
+    if (this.isModified("password")) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+});
+```
+
+---
+
+### [코드품질] 10. 환경 변수화 / 매직넘버 상수화
+
+**문제**: AI 모델명과 쿠키 만료 시간이 하드코딩되어 변경 시 코드 수정 필요.
+적용 파일: `AI/agents/hobby.py`, `routes/user.js`
+
+```python
+# Before
+model = genai.GenerativeModel('gemini-2.5-flash')  # 하드코딩
+
+# After — .env의 GEMINI_MODEL 값으로 교체 가능
+model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+```
+
+```js
+// Before
+maxAge: 24 * 60 * 60 * 1000  // 매직넘버
+
+// After
+const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24시간
+maxAge: TOKEN_MAX_AGE_MS
+```
+
+---
+
+### v2.0 개선 요약
+
+| 분류 | 항목 | Before | After |
+|------|------|--------|-------|
+| **성능** | DB 쿼리 병렬화 | 순차 `await` | `Promise.all` 동시 실행 |
+| **성능** | Pinecone 초기화 | 요청마다 재연결 | 모듈 레벨 1회 초기화 |
+| **성능** | DB 인덱스 | 없음 | Meeting·Post·Contact 인덱스 추가 |
+| **안정성** | axios retry | 없음 | 5xx·네트워크 오류 최대 2회 재시도 |
+| **안정성** | LLM 타임아웃 | 10초 | 25초 |
+| **안정성** | LLM retry | 2회 | 3회 |
+| **안정성** | 보상 로직 | 없음 | 문의 답변·게시글 분리 처리 |
+| **보안** | verifyAdmin | 매 요청 DB 조회 | JWT 토큰 기반 처리 |
+| **보안** | password 노출 | 모든 쿼리에 포함 | `select: false` 기본 제외 |
+| **코드품질** | pre-save 훅 | 콜백 중첩 | async/await |
+| **코드품질** | 레거시 코드 | 미사용 메서드 3개 | 제거 |
+| **코드품질** | 하드코딩 | 모델명·매직넘버 | 환경 변수·상수화 |
+| **코드품질** | 에러 로깅 | catch 블록 누락 7곳 | console.error 전체 추가 |
