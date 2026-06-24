@@ -52,6 +52,10 @@ def _build_tools() -> list:
     return tools
 
 
+# 모듈 로드 시 한 번만 초기화 — 요청마다 Pinecone 재연결 방지
+_TOOLS = _build_tools()
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -69,8 +73,6 @@ def call_general_search_agent(state: dict) -> dict:
     """Pinecone RAG + Tavily 검색을 활용하는 범용 ReAct 에이전트."""
     logging.info("--- CALLING: General Search Agent ---")
 
-    tools = _build_tools()
-
     react_prompt = ChatPromptTemplate.from_messages([
         ("system", "당신은 AI 어시스턴트 'MOIT'입니다. 주어진 도구를 활용해 답변하세요."),
         MessagesPlaceholder(variable_name="chat_history", optional=True),
@@ -78,8 +80,8 @@ def call_general_search_agent(state: dict) -> dict:
         MessagesPlaceholder(variable_name="agent_scratchpad")
     ])
 
-    agent = create_openai_tools_agent(llm, tools, react_prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_openai_tools_agent(llm, _TOOLS, react_prompt)
+    executor = AgentExecutor(agent=agent, tools=_TOOLS, verbose=True)
 
     # user_input 정규화
     user_input = state['user_input']

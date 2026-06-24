@@ -1,11 +1,10 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs"); // 👈 bcryptjs로 변경
-const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const userSchema = mongoose.Schema({
-    username: { type: String, unique: 1 }, // username 필드 명시
+    username: { type: String, unique: true },
     name: { type: String, maxlength: 50 },
-    email: { type: String, trim: true, unique: 1 },
+    email: { type: String, trim: true, unique: true },
     password: { type: String, minlength: 5 },
     nickname: { type: String, maxlength: 50 }, // nickname 필드 추가
     lastname: { type: String, maxlength: 50 },
@@ -23,50 +22,13 @@ const userSchema = mongoose.Schema({
     lastLoginAttempt: { type: Date, default: null }
 });
 
-// 비밀번호 암호화 (회원가입 시 자동 실행)
-userSchema.pre("save", function (next) {
-    var user = this;
-
-    // 비밀번호가 변경되었을 때만 암호화
-    if (user.isModified("password")) {
-        bcrypt.genSalt(10, function (err, salt) {
-            if (err) return next(err);
-            bcrypt.hash(user.password, salt, function (err, hash) {
-                if (err) return next(err);
-                user.password = hash;
-                next();
-            });
-        });
-    } else {
-        next();
+// 비밀번호 암호화 (회원가입·비밀번호 변경 시 자동 실행)
+userSchema.pre("save", async function () {
+    if (this.isModified("password")) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
     }
 });
-
-userSchema.methods.comparePassword = function (plainPassword, cb) {
-    bcrypt.compare(plainPassword, this.password, function (err, isMatch) {
-        if (err) return cb(err);
-        cb(null, isMatch);
-    });
-};
-
-// 토큰 생성 메소드
-userSchema.methods.generateToken = function (cb) {
-    var user = this;
-    var token = jwt.sign(user._id.toHexString(), process.env.JWT_SECRET);
-    user.token = token;
-    user.save()
-        .then(() => cb(null, user))
-        .catch((err) => cb(err));
-};
-
-userSchema.statics.findByToken = function (token, cb) {
-    var user = this;
-    jwt.verify(token, process.env.JWT_SECRET, function (err, decoded) {
-        user.findOne({ "_id": decoded, "token": token })
-            .then((user) => cb(null, user))
-            .catch((err) => cb(err));
-    });
-};
 
 const User = mongoose.model("User", userSchema);
 

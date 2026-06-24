@@ -31,13 +31,16 @@ const contactSchema = mongoose.Schema({
   },
   repliedAt: {
     type: Date,
-    default: null
+    default: null,
+    index: true // Q&A 목록 repliedAt 정렬 최적화
   },
   createdAt: {
     type: Date,
     default: Date.now,
   }
 });
+
+contactSchema.index({ status: 1, repliedAt: -1 }); // 완료 필터 + 정렬 복합 인덱스
 
 const Contact = mongoose.model("Contact", contactSchema);
 
