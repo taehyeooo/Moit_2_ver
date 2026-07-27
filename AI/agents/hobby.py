@@ -43,7 +43,7 @@ def normalize(value, min_val, max_val):
     return round((value - min_val) / (max_val - min_val), 4)
 
 
-def generate_prompt(profile: dict) -> str:
+def generate_prompt(profile: dict, previous_recommendations: Optional[List[str]] = None) -> str:
     """5차원 프로파일을 Gemini 프롬프트 문자열로 변환합니다."""
     def get_val(val, fmt="{:.2f}"):
         if val is None:
@@ -63,6 +63,15 @@ def generate_prompt(profile: dict) -> str:
     if ip.get('art_interest',      0.5) < 0.3: hard_constraints += "- '예술' 관련 활동 금지\n"
     if ip.get('activity_interest', 0.5) < 0.3: hard_constraints += "- '신체 활동' 금지\n"
 
+    diversity_note = ""
+    if previous_recommendations:
+        prev_list = ", ".join(previous_recommendations)
+        diversity_note = f"""
+# ★★★ 다양성 규칙 (Diversity Rule) ★★★
+이 사용자에게는 이전에 다음 취미를 이미 추천했습니다: {prev_list}
+프로필상 이 취미들이 여전히 강하게 적합하다는 뚜렷한 근거가 없는 한, 같은 취미를 반복 추천하지 말고 새로운 대안을 우선적으로 제시하세요.
+"""
+
     return f"""# 페르소나: 디지털 치료 레크리에이션 전문가
 사용자의 프로필을 분석하여 맞춤형 취미 3가지를 추천해주세요.
 
@@ -73,6 +82,7 @@ def generate_prompt(profile: dict) -> str:
 * 사회성 선호(DLS): {get_val(dls.get('preferred_sociality_type'), fmt=None)}
 * 관심사(IP): 자연({get_val(ip.get('nature_interest'))}), 창작({get_val(ip.get('craft_interest'))}), 지적({get_val(ip.get('intellect_interest'))}), 예술({get_val(ip.get('art_interest'))}), 신체({get_val(ip.get('activity_interest'))})
 {hard_constraints}
+{diversity_note}
 
 [결과 형식]
 반드시 아래 JSON 형식으로만 출력하세요.
@@ -198,6 +208,7 @@ class HobbyAgentState(TypedDict):
     survey_data: dict
     image_paths: List[str]           # 서버 로컬 파일 경로
     image_base64_list: List[str]     # 프론트엔드 업로드 base64 이미지
+    previous_recommendations: List[str]  # 재설문 시 중복 추천을 피하기 위한 이전 추천 취미 목록
     survey_profile: dict
     final_recommendation: str
 
@@ -222,7 +233,10 @@ def analyze_photo_node(state: HobbyAgentState):
         logging.info("업로드된 이미지 없음 — 설문 데이터만으로 추천")
 
     try:
-        prompt_text = generate_prompt(state.get("survey_profile", {}))
+        prompt_text = generate_prompt(
+            state.get("survey_profile", {}),
+            state.get("previous_recommendations", [])
+        )
         model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
         result = _call_gemini_with_retry(model, prompt_text, image_parts)
     except Exception as e:
@@ -265,5 +279,6 @@ def call_multimodal_hobby_agent(state: dict) -> dict:
         "survey_data": survey_data,
         "image_paths": [],
         "image_base64_list": user_input.get("image_base64_list", []),
+        "previous_recommendations": user_input.get("previous_recommendations", []),
     })
     return {"final_answer": result.get('final_recommendation', "")}

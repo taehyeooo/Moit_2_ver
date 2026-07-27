@@ -26,4 +26,8 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, limits: { fileSize: MAX_SIZE }, fileFilter });
 
+// 디스크에 남길 필요 없이 즉시 AI 서버로 전달만 하는 업로드용 (예: 설문 추천 사진)
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_SIZE }, fileFilter });
+
 module.exports = upload;
+module.exports.uploadMemory = uploadMemory;

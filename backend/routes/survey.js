@@ -1,7 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const fsp = require('fs').promises;
 const axios = require('axios');
 
 /**
@@ -29,6 +27,8 @@ const User = require('../models/User');
 const { verifyToken } = require('../utils/auth');
 const { isMockMode, MOCK_SURVEY_RESPONSE } = require('../utils/mockAI');
 const upload = require('../middleware/upload');
+const { uploadMemory } = upload;
+const { aiLimiter } = require('../middleware/rateLimiter');
 
 // 기존 설문 결과 조회
 router.get('/', verifyToken, async (req, res) => {
@@ -65,12 +65,12 @@ router.post('/', verifyToken, async (req, res) => {
 });
 
 // AI 서버에 추천 요청 (사진 선택 첨부 가능)
-router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) => {
+// 사진은 AI 서버로 전달할 뿐 서버에 영구 보관할 필요가 없어 디스크를 거치지 않는 메모리 업로드를 사용
+router.post('/recommend', aiLimiter, verifyToken, uploadMemory.single('photo'), async (req, res) => {
     try {
         // 목 모드
         if (isMockMode()) {
             console.log("[MOCK] 취미 추천 목 데이터 반환");
-            if (req.file) await fsp.unlink(req.file.path).catch(() => {}); // 임시 파일 정리
             return res.json(MOCK_SURVEY_RESPONSE);
         }
 
@@ -84,12 +84,18 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
 
         const payload = { survey_raw: answers };
 
-        // 사진이 첨부된 경우 base64로 변환하여 AI 서버에 전달
+        // 사진이 첨부된 경우 메모리에 있는 버퍼를 바로 base64로 변환해 AI 서버에 전달 (디스크 I/O 없음)
         if (req.file) {
-            const imageBuffer = await fsp.readFile(req.file.path);
-            payload.image_base64_list = [imageBuffer.toString('base64')];
-            await fsp.unlink(req.file.path).catch(() => {}); // 전송 후 임시 파일 삭제
+            payload.image_base64_list = [req.file.buffer.toString('base64')];
             console.log(`사진 첨부 감지 — base64 변환 완료 (${req.file.originalname})`);
+        }
+
+        // 재설문 시 직전과 똑같은 취미가 또 나오지 않도록, 이전 추천 결과를 AI 서버에 함께 전달
+        const previousResult = await SurveyResult.findOne({ userId: req.user.userId });
+        if (previousResult?.recommendations?.length) {
+            payload.previous_recommendations = previousResult.recommendations
+                .map(r => r.name_ko)
+                .filter(Boolean);
         }
 
         // 변환 책임은 AI 서버(utils/survey.py)가 담당
@@ -118,9 +124,6 @@ router.post('/recommend', verifyToken, upload.single('photo'), async (req, res) 
         res.json(finalAnswer);
 
     } catch (error) {
-        if (req.file) {
-            await fsp.unlink(req.file.path).catch(() => {});
-        }
         if (axios.isAxiosError(error)) {
             if (error.response) {
                 return res.status(500).json({ message: `AI 에이전트 오류: ${error.response.status}` });
