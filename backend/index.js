@@ -6,6 +6,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
+const { apiLimiter } = require("./middleware/rateLimiter");
 const path = require("path");
 
 const app = express();
@@ -39,6 +40,9 @@ const authLimiter = rateLimit({
     legacyHeaders: false,
     message: { message: "요청이 너무 많습니다. 15분 후 다시 시도해주세요." }
 });
+
+// ─── API 공통 요청 제한 (개별 라우터보다 먼저 적용) ────
+app.use("/api", apiLimiter);
 
 // ─── 라우트 ──────────────────────────────────────────
 const userRoutes    = require("./routes/user");

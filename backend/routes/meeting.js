@@ -7,6 +7,7 @@ const Meeting = require('../models/Meeting');
 const { verifyToken } = require('../utils/auth');
 const { isMockMode } = require('../utils/mockAI');
 const upload = require('../middleware/upload');
+const { aiLimiter } = require('../middleware/rateLimiter');
 
 const AI_AGENT_URL = process.env.AI_SERVER_URL || 'http://localhost:8000';
 
@@ -135,7 +136,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // 새로운 모임 생성
-router.post('/', verifyToken, upload.single('meetingImage'), async (req, res) => {
+router.post('/', aiLimiter, verifyToken, upload.single('meetingImage'), async (req, res) => {
     const { title, description, category, location, date, time, maxParticipants } = req.body;
     const host = req.user.userId;
     const coverImage = req.file ? `/uploads/${req.file.filename}` : undefined;
@@ -361,7 +362,7 @@ router.post('/:id/leave', verifyToken, async (req, res) => {
 });
 
 // AI 스마트 검색 (목 모드 시 MongoDB 텍스트 검색으로 대체)
-router.post('/ai-search', async (req, res) => {
+router.post('/ai-search', aiLimiter, async (req, res) => {
     try {
         const { query } = req.body;
         if (!query) return res.status(400).json({ message: '검색어를 입력해주세요.' });
