@@ -53,8 +53,15 @@ class NewMeeting(BaseModel):
 # ─── API 라우트 ───────────────────────────────────────────
 
 @app.post("/agent/invoke")
-async def invoke_agent(request: UserRequest):
-    """마스터 에이전트 호출 — 취미 추천 / 모임 매칭 / 범용 검색 자동 분기"""
+def invoke_agent(request: UserRequest):
+    """
+    마스터 에이전트 호출 — 취미 추천 / 모임 매칭 / 범용 검색 자동 분기
+
+    master_agent.invoke()는 동기(sync) 함수이므로 async def로 선언하면
+    LLM 응답을 기다리는 동안 이벤트 루프 전체가 멈춰 다른 요청을 처리하지
+    못한다. def로 선언해 FastAPI가 스레드풀에서 실행하도록 하여,
+    동시에 들어온 여러 요청이 각자의 스레드에서 병렬로 처리되게 한다.
+    """
     try:
         result = master_agent.invoke({"user_input": request.user_input})
         return {"final_answer": result.get("final_answer", "")}
@@ -64,7 +71,7 @@ async def invoke_agent(request: UserRequest):
 
 
 @app.post("/meetings/add")
-async def add_meeting(meeting: NewMeeting):
+def add_meeting(meeting: NewMeeting):
     """신규 모임을 Pinecone 벡터 DB에 임베딩하여 추가합니다."""
     try:
         index_name = os.getenv("PINECONE_INDEX_NAME_MEETING")
@@ -94,7 +101,7 @@ async def add_meeting(meeting: NewMeeting):
 
 
 @app.delete("/meetings/delete/{meeting_id}")
-async def delete_meeting(meeting_id: str):
+def delete_meeting(meeting_id: str):
     """Pinecone 벡터 DB에서 모임을 삭제합니다."""
     try:
         index_name = os.getenv("PINECONE_INDEX_NAME_MEETING")
